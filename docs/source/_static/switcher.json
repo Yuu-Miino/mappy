@@ -5,7 +5,13 @@
         "url": "https://yuu-miino.github.io/doc.mappy/develop/"
     },
     {
-        "name": "0.0.6 (latest)",
+        "name": "0.1.0 (latest)",
+        "version": "0.1.0",
+        "url": "https://yuu-miino.github.io/doc.mappy/v0.1.0/",
+        "preferred": true
+    },
+    {
+        "name": "0.0.6",
         "version": "0.0.6",
         "url": "https://yuu-miino.github.io/doc.mappy/v0.0.6/"
     },

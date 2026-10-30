@@ -1,26 +1,20 @@
-.. _continuation:
+.. _api-continuation:
 
-.. module:: mappy.continuation
+==============================================
+Parameter continuation (``continuation``)
+==============================================
 
-======================
-Parameter Continuation
-======================
+.. module:: mappy_ds.continuation
 
-.. currentmodule:: mappy.continuation
+.. currentmodule:: mappy_ds.continuation
 
-Method
-------
-
-.. autosummary::
-    :toctree: generated/
-
-    continuation
-
-Result Class
-------------
+Natural-parameter continuation driven by a user-supplied step function. The
+specialised continuations :func:`mappy_ds.root.trace_cycle` and
+:func:`mappy_ds.root.trace_local_bf` are built on it.
 
 .. autosummary::
-    :toctree: generated/
+   :toctree: generated/
 
-    ContinuationFunResult
-
+   continuation
+   StepFunctionResult
+   ContinuationStep

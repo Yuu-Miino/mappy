@@ -1,4 +1,137 @@
 [build-system]
-requires = [ "wheel", "setuptools" ]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
+[project]
+name = "mappy-ds"
+version = "0.1.0"
+description = "Poincaré maps, periodic points and bifurcations of hybrid dynamical systems"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Yuu Miino" }]
+requires-python = ">=3.11"
+keywords = [
+  "dynamical-systems",
+  "hybrid-systems",
+  "poincare-map",
+  "bifurcation",
+  "continuation",
+  "nonlinear-dynamics",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Mathematics",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Typing :: Typed",
+]
+dependencies = [
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "sympy>=1.12",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.8"]
+
+[project.urls]
+Homepage = "https://github.com/Yuu-Miino/mappy"
+Documentation = "https://yuu-miino.github.io/doc.mappy/latest/"
+Repository = "https://github.com/Yuu-Miino/mappy"
+Issues = "https://github.com/Yuu-Miino/mappy/issues"
+Changelog = "https://github.com/Yuu-Miino/mappy/blob/master/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+  { include-group = "test" },
+  { include-group = "lint" },
+  { include-group = "docs" },
+]
+test = [
+  "pytest>=8",
+  "pytest-cov>=5",
+  "matplotlib>=3.8",
+]
+lint = [
+  "ruff>=0.9",
+  "mypy>=1.13",
+  "scipy-stubs>=1.14",
+  "matplotlib>=3.8",
+]
+docs = [
+  "sphinx>=8",
+  "pydata-sphinx-theme>=0.16",
+  "numpydoc>=1.8",
+  "sphinx-design>=0.6",
+  "matplotlib>=3.8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mappy_ds"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/", "tests/", "examples/", "README.md", "LICENSE", "CHANGELOG.md"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src", "tests"]
+# Scratch scripts accompanying the LaTeX note; kept verbatim, not maintained.
+extend-exclude = ["docs/notes"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W",   # pycodestyle
+  "F",        # pyflakes
+  "I",        # isort
+  "UP",       # pyupgrade
+  "B",        # bugbear
+  "SIM",      # simplify
+  "RUF",      # ruff-specific
+  "NPY",      # numpy
+  "N",        # pep8-naming
+  "D",        # pydocstyle
+]
+ignore = [
+  "D105",  # magic methods need no docstring
+  "D107",  # __init__ documented in the class docstring
+  "D203",  # conflicts with D211
+  "D213",  # conflicts with D212
+  "E741",  # ambiguous names like `I` are conventional in these models
+  "N803",  # argument names such as `I`, `B0` follow the mathematics
+  "N806",  # same for local variables
+  "RUF002", "RUF003",  # ambiguous unicode in docstrings/comments (math)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+"examples/**" = ["D"]
+"docs/**" = ["D", "I"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["sympy.*", "matplotlib.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["mappy_ds"]
+branch = true

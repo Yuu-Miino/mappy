@@ -1,9 +1,13 @@
 # Minimal makefile for Sphinx documentation
 #
+# The CI build (.github/workflows/deploy_docs.yaml) is equivalent to
+#   uv run sphinx-build -W --keep-going -b html docs/source docs/build/html
+# from the repository root, i.e. `make html` here.
+# Without network access, set MAPPY_DOCS_OFFLINE=1 to skip intersphinx.
 
 # You can set these variables from the command line, and also
 # from the environment for the first two.
-SPHINXOPTS    ?=
+SPHINXOPTS    ?= -W --keep-going
 SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = source
 BUILDDIR      = build
@@ -25,7 +29,7 @@ clean:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 .PHONY: html
-html: # sphinx-apidoc # ds_mode
-	$(SPHINXBUILD) "$(SOURCEDIR)" "$(BUILDDIR)/html"
+html:
+	$(SPHINXBUILD) -b html $(SPHINXOPTS) $(O) "$(SOURCEDIR)" "$(BUILDDIR)/html"
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
