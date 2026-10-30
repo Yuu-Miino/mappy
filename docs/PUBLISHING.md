@@ -105,3 +105,6 @@ publisher of the new `mappy-ds` project.
   `doc_mappy_deploy_key` as the `DOC_DEPLOY_KEY` secret of `mappy`, then
   delete both files. Deploy keys do not expire and are scoped to one
   repository, unlike a personal access token.
+  To publish the docs of an existing tag again (e.g. after such a failure),
+  run the `Deploy documents` workflow manually from the **Actions** tab with
+  the tag name as its `ref` input.
