@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `examples/henon.py --mode bifurcation|mle` (one-parameter bifurcation
+  diagram and maximum Lyapunov exponent by Benettin's method) and
+  `examples/duffing.py --mode bifurcation`, reproducing Fig. 8 and Fig. 10
+  of Miino (2024); ported from the `develop` branch.
+- The release workflow checks that the pushed tag matches the version in
+  `pyproject.toml`.
+
+### Changed
+
+- The docs are deployed to `doc.mappy` with a deploy key (`DOC_DEPLOY_KEY`)
+  instead of a personal access token, and `Deploy documents` can be run
+  manually for any tag or branch.
+
 ## [0.1.0] - 2026-10-30
 
 A rewrite of the package. The mode concept and the numerics are those of
@@ -56,7 +71,7 @@ unreleased `mappy` 0.0.x.
 
 ### Added
 
-- Test suite (164 tests) including finite-difference validation of Jacobians
+- Test suite (175 tests) including finite-difference validation of Jacobians
   and Hessians through borders and the reference values of the paper.
 - GitHub Actions: lint/type-check/test matrix, docs deployment, release to
   PyPI through trusted publishing on `v*` tags.

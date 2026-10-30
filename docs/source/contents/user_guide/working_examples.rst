@@ -56,7 +56,12 @@ Mode graph:
    map ──▶ map
 
 The interactive plot shows only the image points (``only_map=True``); ``a``
-and ``b`` can be changed with the keyboard.
+and ``b`` can be changed with the keyboard. Two further modes sweep
+:math:`a \in [1, 1.42]`: ``--mode bifurcation`` draws the one-parameter
+bifurcation diagram of :math:`x`, and ``--mode mle`` the maximum Lyapunov
+exponent by Benettin's method — a unit tangent vector is pushed forward by
+``res.jac`` at every iteration and renormalised — which is positive exactly
+in the chaotic windows of the diagram.
 
 Izhikevich neuron
 =================
@@ -117,6 +122,9 @@ The ``trace`` mode follows the fixed point along :math:`B` and locates
 period-doubling bifurcations (the first at :math:`B \approx 0.17169` for
 :math:`k = 0.2`, :math:`B_0 = 0.1`), then continues one of them in the
 :math:`(B, B_0)` plane.
+``--mode bifurcation`` draws the one-parameter bifurcation diagram of
+:math:`x` on the section over :math:`B \in [0.1, 0.375]`; the 1-periodic
+point is unstable between the two period doublings.
 
 Forced Alpazur oscillator
 =========================
