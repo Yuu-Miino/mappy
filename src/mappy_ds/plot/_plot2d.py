@@ -265,8 +265,16 @@ def _setup_plot2d(
     )
 
     fig, ax = pyplot.subplots(figsize=config.figsize)
-    if "f" in rcParams["keymap.fullscreen"]:
+    # "f" toggles trajectories here; take it away from the fullscreen keymap for
+    # the lifetime of this figure only.
+    removed_fullscreen_key = "f" in rcParams["keymap.fullscreen"]
+    if removed_fullscreen_key:
         rcParams["keymap.fullscreen"].remove("f")
+
+    def on_close(_event: Any) -> None:
+        if removed_fullscreen_key and "f" not in rcParams["keymap.fullscreen"]:
+            rcParams["keymap.fullscreen"].append("f")
+
     _draw_axes(ax, config)
 
     def iterate() -> MapResult:
@@ -344,6 +352,9 @@ def _setup_plot2d(
                     return
                 key = config.param_keys[state.param_index % len(config.param_keys)]
                 step = config.param_step * (-1 if event.key == "down" else 1)
+                if key not in state.params:
+                    print(f"parameter {key!r} is not in params")
+                    return
                 state.params[key] = round(state.params[key] + step, 10)
                 print({k: state.params[k] for k in config.param_keys})
 
@@ -369,6 +380,7 @@ def _setup_plot2d(
 
     fig.canvas.mpl_connect("key_press_event", on_key)
     fig.canvas.mpl_connect("button_press_event", on_click)
+    fig.canvas.mpl_connect("close_event", on_close)
     return fig, update, state
 
 
