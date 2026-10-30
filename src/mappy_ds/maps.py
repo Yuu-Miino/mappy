@@ -119,6 +119,13 @@ class Map(ABC):
         Returns
         -------
         MapResult
+
+        Notes
+        -----
+        Requesting derivatives integrates the variational equations together
+        with the state, which changes the adaptive step sizes of the ODE
+        solver. The image therefore differs slightly (on the order of the
+        solver tolerance) from the one obtained with ``jacobian=False``.
         """
 
     def image(self, y0: StateLike, params: Params | None = None, n: int = 1) -> State:
