@@ -14,13 +14,14 @@ import numpy.typing as npt
 from ._typing import Hessian, Jacobian, Params, State, StateLike, as_state
 from .exceptions import TransitionError, UnknownModeError
 from .functions import SystemFunction
-from .modes import DiscreteMode, Mode
+from .modes import ContinuousMode, DiscreteMode, Mode
 from .trajectory import Trajectory
 
 __all__ = ["Diffeomorphism", "Map", "MapResult", "PoincareMap", "Transitions"]
 
-#: Transition rule: mode name → next mode name, or one next mode per border.
-Transitions = Mapping[str, str | Sequence[str]]
+#: Transition rules: mode name → next mode name, or one next mode per border
+#: given as a list (in ``borders`` order) or as ``{border_name: next_mode}``.
+Transitions = Mapping[str, str | Sequence[str] | Mapping[str, str]]
 
 
 @dataclass
@@ -174,10 +175,16 @@ class PoincareMap(Map):
     modes : sequence of Mode
         All modes of the system, with distinct names.
     transitions : mapping
-        ``{mode_name: next_mode_name}`` for discrete modes and for continuous
-        modes with at most one border (a borderless mode ends at
-        ``max_interval``), or ``{mode_name: [next, ...]}`` with one entry per
-        border for continuous modes with several borders.
+        Successor of each mode. The value is
+
+        * a mode name (``str``) for a discrete mode, a borderless continuous
+          mode (which ends at ``max_interval``) or, as a shorthand, a
+          continuous mode with a single border;
+        * a list of mode names, one per border in the order of ``borders``;
+        * a mapping ``{border_name: mode_name}`` covering every border of the
+          mode (see the ``name`` argument of :func:`~mappy_ds.border`).
+
+        Only modes reachable from ``initial_mode`` need a rule.
     initial_mode : str
         Mode the map starts in (the Poincaré section).
     end_modes : str or sequence of str, optional
@@ -185,6 +192,18 @@ class PoincareMap(Map):
     max_transitions : int, optional
         Safety bound on the number of mode transitions per iteration, by
         default ``1000``.
+
+    Raises
+    ------
+    UnknownModeError
+        If a mode name in ``transitions``, ``initial_mode`` or ``end_modes``
+        is not among ``modes``.
+    TransitionError
+        If a rule does not match its mode (wrong number of entries, unknown
+        or missing border name), if a mode reachable from ``initial_mode``
+        has no rule, if the codomain of a mode and the domain of its
+        successor have different dimensions, or if no end mode can be
+        reached from ``initial_mode``.
 
     Examples
     --------
@@ -205,15 +224,13 @@ class PoincareMap(Map):
             if m.name in self.modes:
                 raise ValueError(f"duplicate mode name {m.name!r}")
             self.modes[m.name] = m
-        self.transitions: dict[str, str | tuple[str, ...]] = {}
-        for src, dst in transitions.items():
+        #: Successors of each mode, one per border (a single entry for modes
+        #: without borders).
+        self.transitions: dict[str, tuple[str, ...]] = {}
+        for src, rule in transitions.items():
             if src not in self.modes:
                 raise UnknownModeError(src)
-            targets = (dst,) if isinstance(dst, str) else tuple(dst)
-            for t in targets:
-                if t not in self.modes:
-                    raise UnknownModeError(t)
-            self.transitions[src] = targets[0] if isinstance(dst, str) else targets
+            self.transitions[src] = self._normalize_rule(self.modes[src], rule)
         if initial_mode not in self.modes:
             raise UnknownModeError(initial_mode)
         self.initial_mode = initial_mode
@@ -228,6 +245,79 @@ class PoincareMap(Map):
                 raise UnknownModeError(e)
         self.end_modes = ends
         self.max_transitions = int(max_transitions)
+        self._check_graph()
+
+    def _normalize_rule(
+        self, mode: Mode, rule: str | Sequence[str] | Mapping[str, str]
+    ) -> tuple[str, ...]:
+        """Turn a transition rule into one successor per border."""
+        names = mode.border_names if isinstance(mode, ContinuousMode) else ()
+        n_exits = max(len(names), 1)
+        if isinstance(rule, str):
+            if n_exits != 1:
+                raise TransitionError(
+                    mode.name,
+                    reason=f"the mode has {n_exits} borders but the rule names "
+                    "a single successor",
+                )
+            targets: tuple[str, ...] = (rule,)
+        elif isinstance(rule, Mapping):
+            if not names:
+                raise TransitionError(
+                    mode.name, reason="the mode has no borders to name in a mapping"
+                )
+            unknown = set(rule) - set(names)
+            missing = set(names) - set(rule)
+            if unknown or missing:
+                reason = []
+                if unknown:
+                    reason.append(f"unknown border(s) {sorted(unknown)}")
+                if missing:
+                    reason.append(f"no successor for border(s) {sorted(missing)}")
+                raise TransitionError(mode.name, reason="; ".join(reason))
+            targets = tuple(rule[name] for name in names)
+        else:
+            targets = tuple(rule)
+            if len(targets) != n_exits:
+                raise TransitionError(
+                    mode.name,
+                    reason=f"expected {n_exits} successor(s) for "
+                    f"{len(names)} border(s), got {len(targets)}",
+                )
+        for t in targets:
+            if not isinstance(t, str):
+                raise TypeError(f"mode names must be strings, got {t!r}")
+            if t not in self.modes:
+                raise UnknownModeError(t)
+            if mode.cod_dim != self.modes[t].dom_dim:
+                raise TransitionError(
+                    mode.name,
+                    reason=f"it ends in dimension {mode.cod_dim} but "
+                    f"{t!r} starts in dimension {self.modes[t].dom_dim}",
+                )
+        return targets
+
+    def _check_graph(self) -> None:
+        """Check that every reachable mode has a rule and an end mode is reachable."""
+        seen: set[str] = set()
+        frontier = [self.initial_mode]
+        reachable_after_start: set[str] = set()
+        while frontier:
+            name = frontier.pop()
+            if name in seen:
+                continue
+            seen.add(name)
+            if name not in self.transitions:
+                raise TransitionError(name, reason="no rule for a reachable mode")
+            for nxt in self.transitions[name]:
+                reachable_after_start.add(nxt)
+                if nxt not in seen:
+                    frontier.append(nxt)
+        if not reachable_after_start & set(self.end_modes):
+            raise TransitionError(
+                self.initial_mode,
+                reason=f"no end mode {list(self.end_modes)} is reachable",
+            )
 
     def __repr__(self) -> str:
         return (
@@ -242,13 +332,12 @@ class PoincareMap(Map):
     def _next_mode(self, mode: Mode, border: int | None) -> str:
         try:
             rule = self.transitions[mode.name]
-        except KeyError:
+        except KeyError:  # pragma: no cover - ruled out by _check_graph
             raise TransitionError(mode.name) from None
-        if isinstance(rule, str):
-            return rule
-        if border is None or border >= len(rule):
+        index = 0 if border is None else border
+        if index >= len(rule):  # pragma: no cover - ruled out by _normalize_rule
             raise TransitionError(mode.name, border)
-        return rule[border]
+        return rule[index]
 
     def _run(
         self,

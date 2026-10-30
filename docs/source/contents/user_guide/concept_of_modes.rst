@@ -134,11 +134,20 @@ The transitions of a :class:`~mappy_ds.PoincareMap` (type
   form for discrete modes, for continuous modes without borders and, as a
   shorthand, for continuous modes with a single border;
 * a **list** — one next mode per border, in the order of the ``borders`` of a
-  continuous mode: ``{"flow": ["after_q0", "after_q1"]}``.
+  continuous mode: ``{"flow": ["after_q0", "after_q1"]}``;
+* a **mapping from border name to next mode** —
+  ``{"flow": {"q0": "after_q0", "q1": "after_q1"}}``. The name of a border is
+  its function name unless ``@border(..., name="q0")`` says otherwise. This
+  form does not depend on the order of ``borders`` and is the recommended one
+  for modes with several borders.
 
-Unknown mode names raise :class:`~mappy_ds.UnknownModeError` when the map is
-constructed. A mode without a transition rule, or a border index beyond the
-end of the list, raises :class:`~mappy_ds.TransitionError` when it is reached.
+The rules are checked when the map is constructed, not when a transition is
+taken: unknown mode names raise :class:`~mappy_ds.UnknownModeError`, and
+:class:`~mappy_ds.TransitionError` reports a rule with the wrong number of
+entries, an unknown or missing border name, a mode that is reachable from
+``initial_mode`` but has no rule, a successor whose domain dimension differs
+from the codomain of the mode, or a graph in which no end mode can be reached.
+Modes that cannot be reached from ``initial_mode`` need no rule.
 
 Initial and end modes
 =====================

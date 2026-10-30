@@ -143,11 +143,13 @@ def build_map() -> PoincareMap:
         DiscreteMode("p2", p),
         DiscreteMode("pinv2", p_inv),
     ]
+    # Continuous modes name their successors per border, so the rule does not
+    # depend on the order of ``borders=[...]`` above.
     transitions = {
         "p1": "alp_1",
         "p2": "alp_2",
-        "alp_1": ["alp_2", "pr1"],
-        "alp_2": ["alp_1", "pr2"],
+        "alp_1": {"border_1": "alp_2", "poin_sec": "pr1"},
+        "alp_2": {"border_2": "alp_1", "poin_sec": "pr2"},
         "pr1": "pinv1",
         "pr2": "pinv2",
         "pinv1": "p1",

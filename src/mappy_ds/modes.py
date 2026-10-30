@@ -243,6 +243,11 @@ class ContinuousMode(Mode):
                 raise ValueError(
                     f"border {b.__name__!r} has dim {b.dom_dim}, expected {fun.dom_dim}"
                 )
+        if len({b.name for b in self.borders}) != len(self.borders):
+            raise ValueError(
+                f"borders of mode {name!r} must have distinct names; "
+                "pass name=... to @border(...)"
+            )
         self.max_interval = float(max_interval)
         self.trajectory_dt = float(trajectory_dt)
         self.solver_options: dict[str, Any] = {
@@ -251,6 +256,11 @@ class ContinuousMode(Mode):
             "atol": atol,
             **solver_options,
         }
+
+    @property
+    def border_names(self) -> tuple[str, ...]:
+        """Names of the borders, in the order of ``borders``."""
+        return tuple(b.name for b in self.borders)
 
     # -- right-hand sides of the (variational) ODE ---------------------------
 

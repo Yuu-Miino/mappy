@@ -41,18 +41,30 @@ class UnknownModeError(MappyError, KeyError):
 
 
 class TransitionError(MappyError):
-    """No next mode is defined for the current mode (and border)."""
+    """The transition rules of a Poincaré map are inconsistent.
 
-    def __init__(self, mode: str, border: int | None = None) -> None:
-        super().__init__(mode, border)
+    Raised when a map is constructed with a rule that does not fit its mode
+    (missing rule, wrong number of entries, unknown border name, mismatched
+    dimensions, no reachable end mode) or, at run time, when a mode ends
+    through a border that has no successor.
+    """
+
+    def __init__(
+        self, mode: str, border: int | str | None = None, reason: str | None = None
+    ) -> None:
+        super().__init__(mode, border, reason)
         self.mode = mode
         self.border = border
+        self.reason = reason
 
     def __str__(self) -> str:
+        if self.reason is not None:
+            return f"transition from mode {self.mode!r}: {self.reason}"
         if self.border is None:
             return f"no transition is defined from mode {self.mode!r}"
         return (
-            f"no transition is defined from mode {self.mode!r} via border {self.border}"
+            f"no transition is defined from mode {self.mode!r} via border "
+            f"{self.border!r}"
         )
 
 

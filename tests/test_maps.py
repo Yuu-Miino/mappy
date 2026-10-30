@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -18,6 +20,7 @@ from mappy_ds import (
     TrajectorySegment,
     TransitionError,
     UnknownModeError,
+    border,
     mapping,
     vector_field,
 )
@@ -398,7 +401,7 @@ def test_duplicate_mode_names():
     [
         ({"x": "a"}, "a", None),  # unknown source
         ({"a": "x"}, "a", None),  # unknown target
-        ({"a": ["b", "x"]}, "a", None),  # unknown target in a list
+        ({"a": ["x"]}, "a", None),  # unknown target in a list
         ({"a": "b"}, "x", None),  # unknown initial mode
         ({"a": "b"}, "a", "x"),  # unknown end mode
         ({"a": "b"}, "a", ["b", "x"]),  # unknown end mode in a list
@@ -412,27 +415,109 @@ def test_unknown_modes(ab_modes, transitions, initial, end):
     assert "'x'" in str(excinfo.value)
 
 
-def test_missing_transition(ab_modes):
-    pmap = PoincareMap(ab_modes, {"a": "b"}, "a")
+def test_missing_rule_for_reachable_mode(ab_modes):
     with pytest.raises(TransitionError) as excinfo:
-        pmap.image([1.0])
+        PoincareMap(ab_modes, {"a": "b"}, "a")
     assert excinfo.value.mode == "b"
-    assert excinfo.value.border is None
+    assert "reachable" in str(excinfo.value)
 
 
-def test_missing_transition_for_border(izh_params):
+def test_unreachable_mode_needs_no_rule(ab_modes):
+    pmap = PoincareMap([*ab_modes, DiscreteMode("c", ident)], {"a": "a"}, "a")
+    assert pmap.image([1.0]) == [1.0]
+
+
+def test_rule_with_wrong_number_of_entries(izh_params):
     from conftest import fire, firing, izhikevich
 
-    pmap = PoincareMap(
-        [ContinuousMode("A", izhikevich, borders=[fire]), DiscreteMode("B", firing)],
-        {"B": "A", "A": []},
-        "B",
-    )
+    modes = [ContinuousMode("A", izhikevich, borders=[fire]), DiscreteMode("B", firing)]
     with pytest.raises(TransitionError) as excinfo:
-        pmap.image([30.0, -3.0], izh_params)
+        PoincareMap(modes, {"B": "A", "A": []}, "B")
     assert excinfo.value.mode == "A"
-    assert excinfo.value.border == 0
-    assert "border 0" in str(excinfo.value)
+    assert "expected 1" in str(excinfo.value)
+    with pytest.raises(TransitionError, match="single successor"):
+        PoincareMap(
+            [ContinuousMode("A", izhikevich, borders=[fire, fire2]), *modes[1:]],
+            {"B": "A", "A": "B"},
+            "B",
+        )
+
+
+@border(2, name="fire2")
+def fire2(y, _):
+    return y[0] - 40.0
+
+
+def test_named_border_rules(izh_params):
+    from conftest import fire, firing, izhikevich
+
+    modes = [
+        ContinuousMode("A", izhikevich, borders=[fire, fire2]),
+        DiscreteMode("B", firing),
+        DiscreteMode("C", firing),
+    ]
+    by_name = PoincareMap(
+        modes, {"B": "A", "C": "A", "A": {"fire2": "C", "fire": "B"}}, "B"
+    )
+    by_list = PoincareMap(modes, {"B": "A", "C": "A", "A": ["B", "C"]}, "B")
+    assert (
+        by_name.transitions
+        == by_list.transitions
+        == {"B": ("A",), "C": ("A",), "A": ("B", "C")}
+    )
+    assert by_name.image_detail([-50.0, -1.7], izh_params).mode_history == [
+        "B",
+        "A",
+        "B",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("rule", "fragment"),
+    [
+        ({"fire": "B"}, "no successor for border(s) ['fire2']"),
+        ({"fire": "B", "fire2": "C", "nope": "B"}, "unknown border(s) ['nope']"),
+    ],
+)
+def test_named_border_rules_must_match_borders(rule, fragment):
+    from conftest import fire, firing, izhikevich
+
+    modes = [
+        ContinuousMode("A", izhikevich, borders=[fire, fire2]),
+        DiscreteMode("B", firing),
+        DiscreteMode("C", firing),
+    ]
+    with pytest.raises(TransitionError, match=re.escape(fragment)):
+        PoincareMap(modes, {"B": "A", "C": "A", "A": rule}, "B")
+
+
+def test_mapping_rule_rejected_for_discrete_mode(ab_modes):
+    with pytest.raises(TransitionError, match="no borders"):
+        PoincareMap(ab_modes, {"a": {"x": "b"}, "b": "a"}, "a")
+
+
+def test_duplicate_border_names_rejected():
+    from conftest import fire, izhikevich
+
+    with pytest.raises(ValueError, match="distinct names"):
+        ContinuousMode("A", izhikevich, borders=[fire, fire])
+
+
+def test_dimension_mismatch_rejected():
+    @mapping(2, 1)
+    def proj(y, _):
+        return y[0]
+
+    with pytest.raises(
+        TransitionError, match="dimension 1 but 'p' starts in dimension 2"
+    ):
+        PoincareMap([DiscreteMode("p", proj)], {"p": "p"}, "p")
+
+
+def test_unreachable_end_mode_rejected(ab_modes):
+    modes = [*ab_modes, DiscreteMode("c", ident)]
+    with pytest.raises(TransitionError, match="no end mode"):
+        PoincareMap(modes, {"a": "b", "b": "a"}, "a", end_modes="c")
 
 
 def test_borderless_mode_with_list_transition():
@@ -440,11 +525,12 @@ def test_borderless_mode_with_list_transition():
     def decay(y, _):
         return -y
 
-    pmap = PoincareMap(
-        [ContinuousMode("flow", decay, max_interval=1.0)], {"flow": ["flow"]}, "flow"
-    )
-    with pytest.raises(TransitionError):
-        pmap.image([1.0])
+    with pytest.raises(TransitionError, match="expected 1"):
+        PoincareMap(
+            [ContinuousMode("flow", decay, max_interval=1.0)],
+            {"flow": ["flow", "flow"]},
+            "flow",
+        )
 
 
 def test_borderless_flow_as_poincare_map():
@@ -463,9 +549,33 @@ def test_borderless_flow_as_poincare_map():
 
 
 def test_max_transitions_exhausted(ab_modes):
-    modes = [*ab_modes, DiscreteMode("c", ident)]
+    @vector_field(1)
+    def grow(y, _):
+        return y
+
+    @border(1, name="near")
+    def near(y, _):
+        return y[0] - 2.0
+
+    @border(1, name="far")
+    def far(y, _):
+        return y[0] - 1e6
+
+    @mapping(1)
+    def halve(y, _):
+        return y / 2
+
+    modes = [
+        ContinuousMode("flow", grow, borders=[near, far], max_interval=100.0),
+        DiscreteMode("reset", halve),
+        DiscreteMode("end", ident),
+    ]
     pmap = PoincareMap(
-        modes, {"a": "b", "b": "a"}, "a", end_modes="c", max_transitions=10
+        modes,
+        {"flow": {"near": "reset", "far": "end"}, "reset": "flow", "end": "end"},
+        "flow",
+        end_modes="end",
+        max_transitions=10,
     )
     assert pmap.max_transitions == 10
     with pytest.raises(RuntimeError, match="10 transitions"):

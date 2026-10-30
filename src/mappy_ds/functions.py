@@ -89,6 +89,9 @@ class SystemFunction:
         Only meaningful for border functions: direction of the zero crossing
         that terminates a continuous mode (``1``, ``-1`` or ``0`` for both),
         forwarded to :func:`scipy.integrate.solve_ivp` events.
+    name : str, optional
+        Name of the function, by default ``fun.__name__``. Border names
+        identify borders in transition rules.
 
     Attributes
     ----------
@@ -109,6 +112,7 @@ class SystemFunction:
         dom_dim: int,
         cod_dim: int,
         direction: int = 0,
+        name: str | None = None,
     ) -> None:
         if dom_dim < 1 or cod_dim < 1:
             raise ValueError("dom_dim and cod_dim must be positive integers")
@@ -116,7 +120,10 @@ class SystemFunction:
         self.dom_dim = int(dom_dim)
         self.cod_dim = int(cod_dim)
         self.direction = int(direction)
-        self.__name__ = getattr(fun, "__name__", type(self).__name__)
+        self.name = str(
+            getattr(fun, "__name__", type(self).__name__) if name is None else name
+        )
+        self.__name__ = self.name
         self.__doc__ = getattr(fun, "__doc__", None)
         self.__wrapped__ = fun
 
@@ -304,7 +311,9 @@ def mapping(
     return decorator
 
 
-def border(dim: int, direction: int = 1) -> Callable[[PyFunction], SystemFunction]:
+def border(
+    dim: int, direction: int = 1, name: str | None = None
+) -> Callable[[PyFunction], SystemFunction]:
     """Declare a border (section) :math:`b(y, p) = 0` of a continuous mode.
 
     Parameters
@@ -315,6 +324,9 @@ def border(dim: int, direction: int = 1) -> Callable[[PyFunction], SystemFunctio
         Direction of the zero crossing that triggers the border: ``1`` for
         negative-to-positive, ``-1`` for positive-to-negative and ``0`` for
         both. By default ``1``.
+    name : str, optional
+        Name used to refer to the border in transition rules written as
+        ``{mode: {border_name: next_mode}}``; by default the function name.
 
     Examples
     --------
@@ -322,9 +334,11 @@ def border(dim: int, direction: int = 1) -> Callable[[PyFunction], SystemFunctio
     >>> @border(dim=2)
     ... def fire(y, _):
     ...     return y[0] - 30.0
+    >>> fire.name
+    'fire'
     """
 
     def decorator(fun: PyFunction) -> SystemFunction:
-        return SystemFunction(fun, dim, 1, direction=direction)
+        return SystemFunction(fun, dim, 1, direction=direction, name=name)
 
     return decorator

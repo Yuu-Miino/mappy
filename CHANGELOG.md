@@ -62,6 +62,13 @@ unreleased `mappy` 0.0.x.
   PyPI through trusted publishing on `v*` tags.
 - `max_transitions` safety bound on `PoincareMap`; borderless continuous
   modes act as fixed-time flow maps.
+- Transition rules of a continuous mode can name its borders,
+  `{"flow": {"q0": "after_q0", "q1": "after_q1"}}`, using `@border(...,
+  name=...)` or the function name; this form does not depend on the order
+  of `borders`.
+- `PoincareMap` validates its graph at construction: rule arity against the
+  borders, border names, dimension consistency of every edge, a rule for
+  every reachable mode and reachability of an end mode.
 
 ### Removed
 
