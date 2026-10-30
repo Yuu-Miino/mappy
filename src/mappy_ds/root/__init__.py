@@ -7,10 +7,12 @@
   follow it along a second parameter.
 """
 
+from ..continuation import ContinuationStep
 from ._cycle import CycleResult, find_cycle, trace_cycle
 from ._local_bf import LocalBfResult, find_local_bf, trace_local_bf
 
 __all__ = [
+    "ContinuationStep",
     "CycleResult",
     "LocalBfResult",
     "find_cycle",
