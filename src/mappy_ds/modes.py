@@ -38,6 +38,10 @@ class StepResult:
     hes : numpy.ndarray or None
         Hessian tensor of the mode map, ``hes[i, j, k] = ∂²y_i/(∂y0_j ∂y0_k)``,
         shape ``(cod_dim, dom_dim, dom_dim)``. ``None`` if not requested.
+    jac_p : numpy.ndarray or None
+        Derivative of the mode map with respect to the parameters named in
+        ``param_keys`` of :meth:`Mode.step`, ``jac_p[i, m] = ∂y_i/∂p_m``,
+        shape ``(cod_dim, len(param_keys))``. ``None`` if not requested.
     border : int or None
         Index of the border that terminated a continuous mode, ``None`` for
         discrete modes and for continuous modes without borders.
@@ -50,6 +54,7 @@ class StepResult:
     y: State
     jac: Jacobian | None = None
     hes: Hessian | None = None
+    jac_p: Jacobian | None = None
     border: int | None = None
     t: float | None = None
     segment: TrajectorySegment | None = None
@@ -100,6 +105,7 @@ class Mode(ABC):
         jacobian: bool = False,
         hessian: bool = False,
         trajectory: bool = False,
+        param_keys: Sequence[str] | None = None,
     ) -> StepResult:
         """Evolve ``y0`` through the mode.
 
@@ -115,6 +121,9 @@ class Mode(ABC):
             Compute the Hessian tensor of the mode map (implies ``jacobian``).
         trajectory : bool, optional
             Record the trajectory within the mode.
+        param_keys : sequence of str, optional
+            Compute the derivative of the mode map with respect to these
+            parameters (``StepResult.jac_p``, one column per key).
 
         Returns
         -------
@@ -161,6 +170,7 @@ class DiscreteMode(Mode):
         jacobian: bool = False,
         hessian: bool = False,
         trajectory: bool = False,
+        param_keys: Sequence[str] | None = None,
     ) -> StepResult:
         """Evolve ``y0`` through the mode; see :meth:`Mode.step`."""
         _y0 = as_state(y0)
@@ -168,12 +178,15 @@ class DiscreteMode(Mode):
         y1 = self.fun.eval(_y0, p)
         jac = self.fun.eval_jacobian(_y0, p) if (jacobian or hessian) else None
         hes = self.fun.eval_hessian(_y0, p) if hessian else None
+        jac_p = None
+        if param_keys is not None:
+            jac_p = self.fun.eval_parameter_jacobian_for(_y0, p, param_keys)
         segment = None
         if trajectory and self.in_trajectory and self.dom_dim == self.cod_dim:
             segment = TrajectorySegment(
                 self.name, "discrete", np.column_stack([_y0, y1])
             )
-        return StepResult(y1, jac, hes, segment=segment)
+        return StepResult(y1, jac, hes, jac_p, segment=segment)
 
 
 class ContinuousMode(Mode):
@@ -207,10 +220,13 @@ class ContinuousMode(Mode):
 
         \dot J = D f(\varphi)\, J, \qquad
         \dot H_{ijk} = \sum_{l,m} (D^2 f)_{ilm} J_{lj} J_{mk}
-                        + \sum_l (Df)_{il} H_{ljk}
+                        + \sum_l (Df)_{il} H_{ljk}, \qquad
+        \dot P = D f(\varphi)\, P + \partial_p f(\varphi)
 
-    are integrated along with the state, and the result is corrected for the
-    dependence of the hitting time on the initial state (see the references).
+    are integrated along with the state (:math:`P = \partial\varphi/\partial p`
+    when ``param_keys`` is given), and the result is corrected for the
+    dependence of the hitting time on the initial state and on the parameters
+    (see the references).
 
     References
     ----------
@@ -264,39 +280,47 @@ class ContinuousMode(Mode):
 
     # -- right-hand sides of the (variational) ODE ---------------------------
 
-    def _rhs(self, p: np.ndarray) -> Callable[[float, np.ndarray], np.ndarray]:
-        fun = self.fun
+    def _rhs(
+        self,
+        p: np.ndarray,
+        *,
+        jacobian: bool,
+        hessian: bool,
+        keys: Sequence[str] | None,
+    ) -> Callable[[float, np.ndarray], np.ndarray]:
+        """Right-hand side of the state augmented with the variational systems.
 
-        def rhs(_t: float, y: np.ndarray) -> np.ndarray:
-            return fun.eval(y, p)
-
-        return rhs
-
-    def _rhs_jac(self, p: np.ndarray) -> Callable[[float, np.ndarray], np.ndarray]:
+        Layout of the augmented state: ``y`` (n), then ``J`` (n²) if
+        ``jacobian``, then ``P`` (n·k) if ``keys``, then ``H`` (n³) if
+        ``hessian``.
+        """
         fun, n = self.fun, self.dom_dim
+        k = 0 if keys is None else len(keys)
 
         def rhs(_t: float, z: np.ndarray) -> np.ndarray:
             y = z[:n]
-            jac = z[n:].reshape(n, n)
-            return np.concatenate(
-                [fun.eval(y, p), (fun.eval_jacobian(y, p) @ jac).ravel()]
-            )
-
-        return rhs
-
-    def _rhs_hes(self, p: np.ndarray) -> Callable[[float, np.ndarray], np.ndarray]:
-        fun, n = self.fun, self.dom_dim
-
-        def rhs(_t: float, z: np.ndarray) -> np.ndarray:
-            y = z[:n]
-            jac = z[n : n + n * n].reshape(n, n)
-            hes = z[n + n * n :].reshape(n, n, n)
+            parts = [fun.eval(y, p)]
+            if not (jacobian or hessian or keys is not None):
+                return parts[0]
             df = fun.eval_jacobian(y, p)
-            d2f = fun.eval_hessian(y, p)
-            dhes = np.einsum("ilm,lj,mk->ijk", d2f, jac, jac) + np.einsum(
-                "il,ljk->ijk", df, hes
-            )
-            return np.concatenate([fun.eval(y, p), (df @ jac).ravel(), dhes.ravel()])
+            off = n
+            if jacobian:
+                jac = z[off : off + n * n].reshape(n, n)
+                off += n * n
+                parts.append((df @ jac).ravel())
+            if keys is not None:
+                par = z[off : off + n * k].reshape(n, k)
+                off += n * k
+                fp = fun.eval_parameter_jacobian_for(y, p, keys)
+                parts.append((df @ par + fp).ravel())
+            if hessian:
+                hes = z[off : off + n**3].reshape(n, n, n)
+                d2f = fun.eval_hessian(y, p)
+                dhes = np.einsum("ilm,lj,mk->ijk", d2f, jac, jac) + np.einsum(
+                    "il,ljk->ijk", df, hes
+                )
+                parts.append(dhes.ravel())
+            return np.concatenate(parts)
 
         return rhs
 
@@ -323,24 +347,26 @@ class ContinuousMode(Mode):
         jacobian: bool = False,
         hessian: bool = False,
         trajectory: bool = False,
+        param_keys: Sequence[str] | None = None,
     ) -> StepResult:
         """Evolve ``y0`` through the mode; see :meth:`Mode.step`."""
         n = self.dom_dim
         _y0 = as_state(y0)
         if _y0.shape != (n,):
             raise ValueError(f"expected a state of length {n}, got {_y0.shape}")
-        jacobian = jacobian or hessian
+        jacobian = jacobian or hessian or param_keys is not None
         p = self.fun.params_array(params)
+        k = 0 if param_keys is None else len(param_keys)
 
+        blocks = [_y0]
+        if jacobian:
+            blocks.append(np.eye(n).ravel())
+        if param_keys is not None:
+            blocks.append(np.zeros(n * k))
         if hessian:
-            rhs = self._rhs_hes(p)
-            z0 = np.concatenate([_y0, np.eye(n).ravel(), np.zeros(n**3)])
-        elif jacobian:
-            rhs = self._rhs_jac(p)
-            z0 = np.concatenate([_y0, np.eye(n).ravel()])
-        else:
-            rhs = self._rhs(p)
-            z0 = _y0
+            blocks.append(np.zeros(n**3))
+        z0 = np.concatenate(blocks)
+        rhs = self._rhs(p, jacobian=jacobian, hessian=hessian, keys=param_keys)
 
         record = trajectory and self.in_trajectory
         sol = solve_ivp(
@@ -365,12 +391,20 @@ class ContinuousMode(Mode):
 
         jac: Jacobian | None = None
         hes: Hessian | None = None
+        jac_p: Jacobian | None = None
         if jacobian:
-            jac = z1[n : n + n * n].reshape(n, n).copy()
+            off = n
+            jac = z1[off : off + n * n].reshape(n, n).copy()
+            off += n * n
+            if param_keys is not None:
+                jac_p = z1[off : off + n * k].reshape(n, k).copy()
+                off += n * k
             if hessian:
-                hes = z1[n + n * n :].reshape(n, n, n).copy()
+                hes = z1[off : off + n**3].reshape(n, n, n).copy()
             if border is not None:
-                jac, hes = self._border_correction(y1, p, params, border, jac, hes)
+                jac, hes, jac_p = self._border_correction(
+                    y1, p, params, border, jac, hes, jac_p, param_keys
+                )
 
         segment = None
         if record:
@@ -379,7 +413,7 @@ class ContinuousMode(Mode):
             assert sol.sol is not None
             segment = TrajectorySegment(self.name, "continuous", sol.sol(ts)[:n], ts)
 
-        return StepResult(y1, jac, hes, border=border, t=t1, segment=segment)
+        return StepResult(y1, jac, hes, jac_p, border=border, t=t1, segment=segment)
 
     def _border_correction(
         self,
@@ -389,14 +423,18 @@ class ContinuousMode(Mode):
         border: int,
         jac_flow: Jacobian,
         hes_flow: Hessian | None,
-    ) -> tuple[Jacobian, Hessian | None]:
+        jac_p_flow: Jacobian | None = None,
+        keys: Sequence[str] | None = None,
+    ) -> tuple[Jacobian, Hessian | None, Jacobian | None]:
         """Account for the dependence of the hitting time on the initial state.
 
-        With ``f`` the vector field, ``q`` the border function, ``J`` and
-        ``H`` the derivatives of the flow at the hitting time ``τ``, the mode
-        map ``y0 ↦ φ(τ(y0), y0)`` has Jacobian ``B J`` where
-        ``B = I - f ⊗ ∇q / (∇q · f)``. The Hessian follows by differentiating
-        once more, taking ``∂τ/∂y0 = -(∇q J) / (∇q · f)`` into account.
+        With ``f`` the vector field, ``q`` the border function, ``J``, ``H``
+        and ``P`` the derivatives of the flow at the hitting time ``τ``, the
+        mode map ``y0 ↦ φ(τ(y0, p), y0, p)`` has Jacobian ``B J`` where
+        ``B = I - f ⊗ ∇q / (∇q · f)``, and parameter derivative
+        ``B P - f ⊗ ∂q/∂p / (∇q · f)``. The Hessian follows by
+        differentiating once more, taking ``∂τ/∂y0 = -(∇q J) / (∇q · f)``
+        into account.
         """
         b = self.borders[border]
         pb = b.params_array(params)
@@ -409,8 +447,12 @@ class ContinuousMode(Mode):
             )
         bmat = np.eye(self.dom_dim) - np.outer(f, q) / s
         jac = bmat @ jac_flow
+        jac_p = None
+        if jac_p_flow is not None and keys is not None:
+            qp = b.eval_parameter_jacobian_for(y1, pb, keys)[0]
+            jac_p = bmat @ jac_p_flow - np.outer(f, qp) / s
         if hes_flow is None:
-            return jac, None
+            return jac, None, jac_p
 
         df = self.fun.eval_jacobian(y1, p)
         hq = b.eval_hessian(y1, pb)[0]
@@ -425,4 +467,4 @@ class ContinuousMode(Mode):
         hes = np.einsum("ade,ec,db->abc", dbmat, jac, jac_flow) + np.einsum(
             "ad,dbc->abc", bmat, djac_flow
         )
-        return jac, hes
+        return jac, hes, jac_p

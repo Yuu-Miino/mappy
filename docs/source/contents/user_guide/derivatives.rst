@@ -177,6 +177,53 @@ These are the formulas of the reference paper (Miino 2024, eqs. (13)–(15) for
 the Jacobian and (18)–(22) for the Hessian), written with the index
 convention above.
 
+Parameter derivatives
+=====================
+
+Pass ``parameter_jacobian=True`` to :meth:`~mappy_ds.Map.image_detail` to
+obtain :attr:`MapResult.jac_p <mappy_ds.MapResult.jac_p>`, the derivative of
+the image with respect to the parameters: ``jac_p[i, m] = ∂y_i/∂p_m``, with
+``m`` indexing :attr:`Map.param_keys <mappy_ds.Map.param_keys>` — every
+parameter read by any mode or border of the map, in order of appearance. The
+derivative with respect to the system parameters is what parameter
+continuation and the detection of bifurcations need; the sections above give
+derivatives with respect to the state only.
+
+For a discrete mode the parameter Jacobian :math:`\partial_p f` comes
+straight from SymPy. For a continuous mode the sensitivity
+:math:`P = \partial\varphi/\partial p` of the flow obeys
+
+.. math::
+
+   \deriv{P}{t} = \pderiv{\bm f}{\bm x}\parens{\varphi}\, P
+                  + \pderiv{\bm f}{p}\parens{\varphi}, \qquad P(0) = 0,
+
+which is integrated together with the state. At a border
+:math:`q(\bm x, p) = 0` the hitting time depends on the parameters too, both
+through the trajectory and through the border itself, and the mode map
+:math:`\bm x_0 \mapsto \varphi(\tau(\bm x_0, p), \bm x_0, p)` has
+
+.. math::
+
+   \pderiv{T}{p} = B\, P(\tau) - \frac{\bm f(\bm x_1)}{\nabla q \cdot \bm f(\bm x_1)}
+                   \otimes \pderiv{q}{p}(\bm x_1, p),
+
+with the same :math:`B` as in the border correction above. Compositions
+follow the chain rule :math:`\partial_p (g \circ f) = Dg\, \partial_p f +
+\partial_p g`.
+
+.. code-block:: python
+
+   >>> res = pmap.image_detail(-3.0, params, parameter_jacobian=True)
+   >>> res.param_keys
+   ('I', 'a', 'b', 'c', 'd')
+   >>> res.jac_p.shape
+   (1, 5)
+
+:func:`~mappy_ds.root.find_local_bf` uses ``jac_p`` (together with the
+Jacobian and Hessian) to supply the root finder with an analytic Jacobian of
+the bifurcation conditions.
+
 Composition
 ===========
 

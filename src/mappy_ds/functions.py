@@ -15,7 +15,7 @@ are recorded during the trace and become its :attr:`SystemFunction.param_keys`.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from functools import cached_property
 from typing import Any
 
@@ -102,8 +102,9 @@ class SystemFunction:
     Notes
     -----
     The function is traced with SymPy on first use. The Jacobian follows the
-    convention ``jac[i, j] = ∂f_i/∂y_j`` and the Hessian
-    ``hes[i, j, k] = ∂²f_i/(∂y_j ∂y_k)``.
+    convention ``jac[i, j] = ∂f_i/∂y_j``, the Hessian
+    ``hes[i, j, k] = ∂²f_i/(∂y_j ∂y_k)`` and the parameter Jacobian
+    ``jac_p[i, m] = ∂f_i/∂p_m`` with ``m`` indexing ``param_keys``.
     """
 
     def __init__(
@@ -188,6 +189,14 @@ class SystemFunction:
             ]
         )
 
+    @cached_property
+    def parameter_jacobian_expression(self) -> sympy.Matrix:
+        """Symbolic derivative with respect to the parameters (``cod_dim × k``)."""
+        _, p = self._symbols
+        if not p:
+            return sympy.zeros(self.cod_dim, 0)
+        return self.expression.jacobian(p)
+
     def _compile(self, expr: Any) -> Callable[..., Any]:
         y, p = self._symbols
         compiled: Callable[..., Any] = sympy.lambdify(
@@ -206,6 +215,10 @@ class SystemFunction:
     @cached_property
     def _hes(self) -> Callable[..., Any]:
         return self._compile(self.hessian_expression)
+
+    @cached_property
+    def _jac_p(self) -> Callable[..., Any]:
+        return self._compile(self.parameter_jacobian_expression)
 
     # -- numeric evaluation ------------------------------------------------
 
@@ -251,6 +264,36 @@ class SystemFunction:
         return np.asarray(self._hes(y, p), dtype=np.float64).reshape(
             self.cod_dim, self.dom_dim, self.dom_dim
         )
+
+    def parameter_jacobian(
+        self, y: StateLike, params: Params | None = None
+    ) -> Jacobian:
+        """Evaluate ``∂f/∂p`` at ``y``, columns in the order of ``param_keys``."""
+        return self.eval_parameter_jacobian(as_state(y), self.params_array(params))
+
+    def eval_parameter_jacobian(self, y: State, p: np.ndarray) -> Jacobian:
+        """Parameter Jacobian with a pre-extracted parameter array (hot path)."""
+        if not self.param_keys:
+            return np.zeros((self.cod_dim, 0))
+        return np.asarray(self._jac_p(y, p), dtype=np.float64).reshape(
+            self.cod_dim, len(self.param_keys)
+        )
+
+    def eval_parameter_jacobian_for(
+        self, y: State, p: np.ndarray, keys: Sequence[str]
+    ) -> Jacobian:
+        """Parameter Jacobian with columns laid out along ``keys``.
+
+        Parameters the function does not read give zero columns; parameters it
+        reads but that are absent from ``keys`` are treated as constants.
+        """
+        out = np.zeros((self.cod_dim, len(keys)))
+        if self.param_keys:
+            local = self.eval_parameter_jacobian(y, p)
+            for m, key in enumerate(self.param_keys):
+                if key in keys:
+                    out[:, keys.index(key)] = local[:, m]
+        return out
 
 
 def vector_field(dim: int) -> Callable[[PyFunction], SystemFunction]:

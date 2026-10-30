@@ -595,3 +595,74 @@ def test_diffeomorphism_trajectory(henon_map, henon_fun, henon_params):
     y1 = henon_fun(y0, henon_params)
     y2 = henon_fun(y1, henon_params)
     assert_allclose(traj.y, np.column_stack([y0, y1, y1, y2]))
+
+
+# -- parameter derivatives ----------------------------------------------------
+
+
+def test_param_keys_union_in_order(izh_map, henon_map):
+    assert izh_map.param_keys == ("I", "a", "b", "c", "d")
+    assert henon_map.param_keys == ("a", "b")
+
+
+def test_param_keys_include_border_parameters():
+    @vector_field(1)
+    def field(y, p):
+        return np.array([p["v"]])
+
+    @border(1)
+    def stop(y, p):
+        return y[0] - p["c"]
+
+    @mapping(1)
+    def reset(y, p):
+        return y - p["c"] + p["r"]
+
+    pmap = PoincareMap(
+        [ContinuousMode("flow", field, borders=[stop]), DiscreteMode("reset", reset)],
+        {"flow": "reset", "reset": "flow"},
+        "flow",
+    )
+    assert pmap.param_keys == ("v", "c", "r")
+    res = pmap.image_detail(
+        0.0, {"v": 2.0, "c": 1.0, "r": 0.25}, parameter_jacobian=True
+    )
+    # T(y0) = c - c + r = r: no dependence on v or c, slope 1 in r
+    assert_allclose(res.y, [0.25], atol=1e-9)
+    assert_allclose(res.jac_p, [[0.0, 0.0, 1.0]], atol=1e-8)
+    assert res.param_keys == ("v", "c", "r")
+
+
+def _fd_param_map(diffeo, y0, params, keys, n=1, h=1e-6):
+    cols = []
+    for k in keys:
+        up = diffeo.image(y0, {**params, k: params[k] + h}, n)
+        dn = diffeo.image(y0, {**params, k: params[k] - h}, n)
+        cols.append((up - dn) / (2 * h))
+    return np.column_stack(cols)
+
+
+def test_henon_parameter_jacobian_composes(henon_map, henon_params):
+    y0 = np.array([0.1, 0.2])
+    res = henon_map.image_detail(y0, henon_params, n=3, parameter_jacobian=True)
+    assert res.jac is not None and res.jac_p is not None
+    assert res.jac_p.shape == (2, 2)
+    fd = _fd_param_map(henon_map, y0, henon_params, res.param_keys, n=3)
+    assert_allclose(res.jac_p, fd, rtol=1e-6, atol=1e-8)
+
+
+def test_izhikevich_parameter_jacobian_matches_fd(izh_map_tight, izh_params):
+    res = izh_map_tight.image_detail(-3.0, izh_params, n=2, parameter_jacobian=True)
+    assert res.jac_p is not None and res.jac_p.shape == (1, 5)
+    fd = _fd_param_map(izh_map_tight, -3.0, izh_params, res.param_keys, n=2)
+    assert_allclose(res.jac_p, fd, rtol=1e-5, atol=1e-6)
+
+
+def test_parameter_jacobian_not_requested(henon_map, henon_params):
+    res = henon_map.image_detail([0.1, 0.2], henon_params)
+    assert res.jac_p is None
+    assert res.param_keys == ()
+    res = henon_map.image_detail(
+        [0.1, 0.2], henon_params, jacobian=False, parameter_jacobian=True
+    )
+    assert res.jac is not None and res.jac_p is not None  # implies jacobian

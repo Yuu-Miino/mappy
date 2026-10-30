@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Derivatives with respect to the parameters: `image_detail(...,
+  parameter_jacobian=True)` returns `MapResult.jac_p` (columns ordered as
+  `Map.param_keys`), computed from the SymPy parameter Jacobian of each
+  function, the sensitivity equations of continuous modes with the border
+  correction (including borders that depend on parameters) and the chain
+  rule across modes. `Mode.step` takes `param_keys=` and returns
+  `StepResult.jac_p`; `SystemFunction` gains `parameter_jacobian()`.
+- `find_local_bf` solves with an analytic Jacobian of the bifurcation system
+  (Jacobian, Hessian and `jac_p` of the map; only the parameter derivative of
+  `DTⁿ` uses a central difference).
+
 - `examples/henon.py --mode bifurcation|mle` (one-parameter bifurcation
   diagram and maximum Lyapunov exponent by Benettin's method) and
   `examples/duffing.py --mode bifurcation`, reproducing Fig. 8 and Fig. 10
