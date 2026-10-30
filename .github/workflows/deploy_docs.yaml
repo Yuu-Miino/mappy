@@ -49,7 +49,8 @@ jobs:
         with:
           repository: Yuu-Miino/doc.mappy
           ref: gh-pages
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          # Deploy key of doc.mappy (write access); see docs/PUBLISHING.md
+          ssh-key: ${{ secrets.DOC_DEPLOY_KEY }}
 
       - name: Remove current directory
         env:

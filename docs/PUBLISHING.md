@@ -92,6 +92,16 @@ publisher of the new `mappy-ds` project.
   case-sensitive to the workflow file name).
 - **File already exists** — PyPI never accepts the same version twice; bump
   `version` and tag again.
-- **Docs deployment fails** — `deploy_docs.yaml` needs the
-  `PERSONAL_ACCESS_TOKEN` repository secret with write access to
-  `Yuu-Miino/doc.mappy`.
+- **Docs deployment fails** — `deploy_docs.yaml` pushes to
+  `Yuu-Miino/doc.mappy` with a deploy key, stored as the `DOC_DEPLOY_KEY`
+  repository secret of `mappy`. To (re)create it:
+
+  ```sh
+  ssh-keygen -t ed25519 -N "" -C "mappy docs deploy" -f doc_mappy_deploy_key
+  ```
+
+  Add `doc_mappy_deploy_key.pub` under **Settings → Deploy keys** of
+  `doc.mappy` with *Allow write access*, add the private key
+  `doc_mappy_deploy_key` as the `DOC_DEPLOY_KEY` secret of `mappy`, then
+  delete both files. Deploy keys do not expire and are scoped to one
+  repository, unlike a personal access token.
