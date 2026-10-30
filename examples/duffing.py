@@ -27,10 +27,18 @@ Modes (``--mode``):
     its two period-doubling bifurcations (expected at ``B ≈ 0.171687`` and
     ``B ≈ 0.368655`` for ``k = 0.2, B0 = 0.1``) and continue the first one in
     the ``(B, B0)`` plane up to ``B = 0.35``. Prints the results.
+``bifurcation``
+    One-parameter bifurcation diagram of ``x`` on the section over ``B`` in
+    ``[0.1, 0.375]`` (``--resolution`` values of ``B``, ``--frames`` map
+    iterations each after a transient), saved to ``--output``. The two
+    period doublings found by ``trace`` bound the window where the 1-periodic
+    point is unstable. Cf. Miino (2024), Fig. 8 (top). Takes a while: every
+    point is one period of the ODE.
 
 Run from the repository root, e.g.::
 
     uv run python examples/duffing.py --mode trace
+    uv run python examples/duffing.py --mode bifurcation --resolution 60
 """
 
 import argparse
@@ -145,6 +153,34 @@ def run_orbit(pmap: PoincareMap, frames: int, output: str) -> None:
     print(f"saved {frames} iterations to {output}")
 
 
+def run_bifurcation(
+    pmap: PoincareMap, resolution: int, frames: int, output: str
+) -> None:
+    import matplotlib.pyplot as plt
+
+    transient = frames // 4
+    b_values = np.linspace(0.1, 0.375, resolution)
+    y = Y0
+    xs = np.empty((resolution, frames - transient))
+    for k, b in enumerate(b_values):
+        params = {**PARAMS, "B": b}
+        for i in range(frames):
+            y = pmap.image(y, params)
+            if i >= transient:
+                xs[k, i - transient] = y[0]
+        print(f"B = {b:.4f}", end="\r", flush=True)
+    print()
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(
+        np.repeat(b_values, frames - transient), xs.ravel(), ".", ms=1, color="gray"
+    )
+    ax.set(xlabel="B", ylabel="x", xlim=(0.1, 0.375))
+    fig.savefig(output, dpi=150)
+    print(
+        f"saved bifurcation diagram ({resolution} x {frames - transient}) to {output}"
+    )
+
+
 def run_trace(pmap: PoincareMap) -> None:
     res = pmap.image_detail(Y0, PARAMS)
     print(f"T(y0) = {res.y}, eigenvalues {res.eigvals}")
@@ -193,9 +229,16 @@ def run_trace(pmap: PoincareMap) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mode", choices=["plot", "orbit", "trace"], default="plot")
-    parser.add_argument("--frames", type=int, default=50, help="iterations (orbit)")
-    parser.add_argument("--output", default="duffing.png", help="PNG file (orbit)")
+    parser.add_argument(
+        "--mode", choices=["plot", "orbit", "trace", "bifurcation"], default="plot"
+    )
+    parser.add_argument(
+        "--frames", type=int, default=50, help="map iterations (orbit, bifurcation)"
+    )
+    parser.add_argument(
+        "--resolution", type=int, default=120, help="values of B (bifurcation)"
+    )
+    parser.add_argument("--output", default="duffing.png", help="PNG file")
     args = parser.parse_args()
 
     pmap = build_map()
@@ -204,6 +247,8 @@ def main() -> None:
         run_plot(pmap)
     elif args.mode == "orbit":
         run_orbit(pmap, args.frames, args.output)
+    elif args.mode == "bifurcation":
+        run_bifurcation(pmap, args.resolution, args.frames, args.output)
     else:
         run_trace(pmap)
     if args.mode != "plot":

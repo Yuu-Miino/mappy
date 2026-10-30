@@ -22,6 +22,14 @@ jobs:
           enable-cache: true
           python-version: '3.13'
 
+      - name: Check that the tag matches the project version
+        run: |
+          version="$(uv version --short)"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match version ${version} in pyproject.toml"
+            exit 1
+          fi
+
       - name: Build sdist and wheel
         run: uv build
 
