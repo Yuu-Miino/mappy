@@ -17,6 +17,7 @@ from mappy_ds.root import (
     find_cycle,
     find_local_bf,
     trace_cycle,
+    trace_cycle_arclength,
     trace_local_bf,
 )
 
@@ -351,3 +352,102 @@ def test_cofactor_matches_determinant_derivative():
     # Jacobi's formula: d det(a) = sum(C * da); also C = det(a) a^{-T}
     assert_allclose(cof, np.linalg.det(a) * np.linalg.inv(a).T, rtol=1e-10)
     assert_allclose(_cofactor(np.array([[5.0]])), [[1.0]])
+
+
+# -- trace_cycle_arclength -----------------------------------------------------------
+
+
+def test_trace_cycle_arclength_saddle_node_fold():
+    steps = trace_cycle_arclength(
+        Diffeomorphism(saddle_node),
+        [0.5],
+        {"p": 0.25},
+        "p",
+        direction=-1,
+        step=0.05,
+        step_max=0.1,
+        bounds=(-1.0, 0.3),
+    )
+    ps = np.array([s.params["p"] for s in steps])
+    ys = np.array([s.y[0] for s in steps])
+    assert_allclose(ps, ys**2, atol=1e-9)
+    assert ps.min() < 0.01 and ys[-1] < -0.3  # through the fold, onto -sqrt(p)
+    folds = [i for i, s in enumerate(steps) if "fold" in s.info["events"]]
+    assert len(folds) == 1
+    assert ps[folds[0] - 1] < 0.05 and ps[folds[0]] < 0.05
+    for s in steps:
+        assert {
+            "eigvals",
+            "eigvecs",
+            "tangent",
+            "step",
+            "newton_iterations",
+            "events",
+        } <= set(s.info)
+        assert s.info["tangent"].shape == (2,)
+
+
+def test_trace_cycle_arclength_henon_period_doubling(henon_map):
+    params = {"a": 0.1, "b": 0.3}
+    fp = find_cycle(henon_map, [0.7, 0.2], params).y
+    steps = trace_cycle_arclength(
+        henon_map, fp, params, "a", bounds=(0.0, 1.0), step=0.02, step_max=0.1
+    )
+    a_values = np.array([s.params["a"] for s in steps])
+    assert a_values[0] == pytest.approx(0.1) and a_values[-1] > 0.9
+    assert np.all(np.diff(a_values) > 0)  # no fold on this branch
+    for s in steps:
+        assert_allclose(henon_map.image(s.y, s.params), s.y, atol=1e-9)
+    pd = [i for i, s in enumerate(steps) if "period_doubling" in s.info["events"]]
+    assert len(pd) == 1
+    a_pd = 3 * (1 - 0.3) ** 2 / 4  # exact: 0.3675
+    assert steps[pd[0] - 1].params["a"] < a_pd < steps[pd[0]].params["a"]
+    refined = find_local_bf(henon_map, steps[pd[0]].y, steps[pd[0]].params, "a", np.pi)
+    assert refined.success and refined.params["a"] == pytest.approx(a_pd, abs=1e-8)
+    assert not any("fold" in s.info["events"] for s in steps)
+
+
+def test_trace_cycle_arclength_izhikevich(izh_map_module):
+    params = dict(IZH_PARAMS_I8)
+    fp = find_cycle(izh_map_module, [-4.6], params).y
+    steps = trace_cycle_arclength(
+        izh_map_module,
+        fp,
+        params,
+        "I",
+        direction=-1,
+        bounds=(4.5, 8.0),
+        step=0.1,
+        step_max=0.5,
+    )
+    currents = np.array([s.params["I"] for s in steps])
+    assert currents[0] == pytest.approx(8.0)
+    assert np.all(np.diff(currents) < 0) and currents[-1] < 4.7
+    pd = [i for i, s in enumerate(steps) if "period_doubling" in s.info["events"]]
+    assert len(pd) == 1
+    assert steps[pd[0]].params["I"] < 4.5869 < steps[pd[0] - 1].params["I"]
+
+
+def test_trace_cycle_arclength_requires_dependence(henon_map, henon_params):
+    with pytest.raises(ValueError, match="does not depend"):
+        trace_cycle_arclength(henon_map, [0.6, 0.2], henon_params, "zzz")
+
+
+def test_trace_cycle_arclength_callback_and_progress(capsys):
+    seen = []
+    steps = trace_cycle_arclength(
+        Diffeomorphism(saddle_node),
+        [0.5],
+        {"p": 0.25},
+        "p",
+        direction=-1,
+        step=0.1,
+        step_max=0.1,
+        bounds=(-1.0, 0.3),
+        max_steps=5,
+        show_progress=True,
+        callback=seen.append,
+    )
+    assert len(steps) == 6 and len(seen) == 6
+    err = capsys.readouterr().err
+    assert "ARCLENGTH" in err and err.endswith("\n")
