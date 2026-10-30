@@ -36,6 +36,12 @@ class MapResult:
         Jacobian matrix ``jac[i, j] = ∂y_i/∂y0_j`` if requested.
     hes : numpy.ndarray or None
         Hessian tensor ``hes[i, j, k] = ∂²y_i/(∂y0_j ∂y0_k)`` if requested.
+    jac_p : numpy.ndarray or None
+        Derivative with respect to the parameters, ``jac_p[i, m] = ∂y_i/∂p_m``
+        with ``m`` indexing ``param_keys``, if requested.
+    param_keys : tuple of str
+        Parameters the columns of ``jac_p`` refer to (the map's
+        :attr:`Map.param_keys`).
     mode_history : list of str
         Names of the modes visited, starting with the initial mode and ending
         with the final one.
@@ -46,6 +52,8 @@ class MapResult:
     y: State
     jac: Jacobian | None = None
     hes: Hessian | None = None
+    jac_p: Jacobian | None = None
+    param_keys: tuple[str, ...] = ()
     mode_history: list[str] = field(default_factory=list)
     trajectory: Trajectory | None = None
 
@@ -88,6 +96,14 @@ class Map(ABC):
     def dim(self) -> int:
         """Dimension of the domain (and codomain) of the map."""
 
+    @property
+    @abstractmethod
+    def param_keys(self) -> tuple[str, ...]:
+        """Names of all parameters the map depends on.
+
+        This is the column order of :attr:`MapResult.jac_p`.
+        """
+
     @abstractmethod
     def image_detail(
         self,
@@ -98,6 +114,7 @@ class Map(ABC):
         jacobian: bool = True,
         hessian: bool = False,
         trajectory: bool = False,
+        parameter_jacobian: bool = False,
     ) -> MapResult:
         """Compute the ``n``-th image of ``y0`` with derivatives.
 
@@ -116,6 +133,9 @@ class Map(ABC):
             ``False``.
         trajectory : bool, optional
             Record the trajectory, by default ``False``.
+        parameter_jacobian : bool, optional
+            Compute the derivative with respect to every parameter in
+            :attr:`param_keys` (implies ``jacobian``), by default ``False``.
 
         Returns
         -------
@@ -145,21 +165,31 @@ class Map(ABC):
 def _compose(
     jac: Jacobian | None,
     hes: Hessian | None,
+    jac_p: Jacobian | None,
     jac_step: Jacobian | None,
     hes_step: Hessian | None,
-) -> tuple[Jacobian | None, Hessian | None]:
-    """Chain rule for ``g ∘ f`` given derivatives of ``f`` (so far) and ``g``."""
+    jac_p_step: Jacobian | None,
+) -> tuple[Jacobian | None, Hessian | None, Jacobian | None]:
+    """Chain rule for ``g ∘ f`` given derivatives of ``f`` (so far) and ``g``.
+
+    ``D(g∘f) = Dg Df``, ``D²(g∘f) = D²g[Df, Df] + Dg D²f`` and
+    ``∂_p(g∘f) = Dg ∂_p f + ∂_p g``.
+    """
     if jac_step is None:
-        return None, None
+        return None, None, None
     if jac is None:
-        return jac_step, hes_step
+        return jac_step, hes_step, jac_p_step
     if hes is not None and hes_step is not None:
         hes_new = np.einsum("ilm,lj,mk->ijk", hes_step, jac, jac) + np.einsum(
             "il,ljk->ijk", jac_step, hes
         )
     else:
         hes_new = None
-    return jac_step @ jac, hes_new
+    if jac_p is not None and jac_p_step is not None:
+        jac_p_new = jac_step @ jac_p + jac_p_step
+    else:
+        jac_p_new = None
+    return jac_step @ jac, hes_new, jac_p_new
 
 
 class PoincareMap(Map):
@@ -329,6 +359,15 @@ class PoincareMap(Map):
     def dim(self) -> int:  # noqa: D102
         return self.modes[self.initial_mode].dom_dim
 
+    @property
+    def param_keys(self) -> tuple[str, ...]:  # noqa: D102
+        keys: list[str] = []
+        for m in self.modes.values():
+            funs = [m.fun, *(m.borders if isinstance(m, ContinuousMode) else ())]
+            for f in funs:
+                keys.extend(k for k in f.param_keys if k not in keys)
+        return tuple(keys)
+
     def _next_mode(self, mode: Mode, border: int | None) -> str:
         try:
             rule = self.transitions[mode.name]
@@ -348,22 +387,40 @@ class PoincareMap(Map):
         jacobian: bool,
         hessian: bool,
         trajectory: bool,
-    ) -> Iterator[tuple[State, Jacobian | None, Hessian | None, list[str], Trajectory]]:
+        param_keys: tuple[str, ...] | None = None,
+    ) -> Iterator[
+        tuple[
+            State,
+            Jacobian | None,
+            Hessian | None,
+            Jacobian | None,
+            list[str],
+            Trajectory,
+        ]
+    ]:
         """Yield the state after each iteration of the map."""
         y = y0
         jac: Jacobian | None = None
         hes: Hessian | None = None
+        jac_p: Jacobian | None = None
         history = [mode]
         traj = Trajectory()
         current = self.modes[mode]
         for _ in range(n):
             for _ in range(self.max_transitions):
                 res = current.step(
-                    y, params, jacobian=jacobian, hessian=hessian, trajectory=trajectory
+                    y,
+                    params,
+                    jacobian=jacobian,
+                    hessian=hessian,
+                    trajectory=trajectory,
+                    param_keys=param_keys,
                 )
                 y = res.y
                 if jacobian:
-                    jac, hes = _compose(jac, hes, res.jac, res.hes)
+                    jac, hes, jac_p = _compose(
+                        jac, hes, jac_p, res.jac, res.hes, res.jac_p
+                    )
                 if res.segment is not None:
                     traj.segments.append(res.segment)
                 nxt = self._next_mode(current, res.border)
@@ -375,7 +432,7 @@ class PoincareMap(Map):
                 raise RuntimeError(
                     f"no end mode reached after {self.max_transitions} transitions"
                 )
-            yield y, jac, hes, history, traj
+            yield y, jac, hes, jac_p, history, traj
 
     def image_detail(
         self,
@@ -386,13 +443,14 @@ class PoincareMap(Map):
         jacobian: bool = True,
         hessian: bool = False,
         trajectory: bool = False,
+        parameter_jacobian: bool = False,
         mode: str | None = None,
     ) -> MapResult:
         """Compute the ``n``-th image of ``y0`` with derivatives.
 
         Parameters
         ----------
-        y0, params, n, jacobian, hessian, trajectory
+        y0, params, n, jacobian, hessian, trajectory, parameter_jacobian
             See :meth:`Map.image_detail`.
         mode : str, optional
             Mode to start in instead of ``initial_mode``; useful when a
@@ -413,11 +471,27 @@ class PoincareMap(Map):
                 f"mode {start!r} expects a state of length "
                 f"{self.modes[start].dom_dim}, got {_y0.shape}"
             )
+        keys = self.param_keys if parameter_jacobian else None
         runs = self._run(
-            _y0, params, start, n, jacobian or hessian, hessian, trajectory
+            _y0,
+            params,
+            start,
+            n,
+            jacobian or hessian or parameter_jacobian,
+            hessian,
+            trajectory,
+            keys,
         )
-        y, jac, hes, history, traj = collections.deque(runs, maxlen=1).pop()
-        return MapResult(y, jac, hes, history, traj if trajectory else None)
+        y, jac, hes, jac_p, history, traj = collections.deque(runs, maxlen=1).pop()
+        return MapResult(
+            y,
+            jac,
+            hes,
+            jac_p,
+            keys if keys is not None else (),
+            history,
+            traj if trajectory else None,
+        )
 
     def image(
         self,
@@ -488,6 +562,10 @@ class Diffeomorphism(Map):
     def dim(self) -> int:  # noqa: D102
         return self.mode.dom_dim
 
+    @property
+    def param_keys(self) -> tuple[str, ...]:  # noqa: D102
+        return self.mode.fun.param_keys
+
     def image_detail(
         self,
         y0: StateLike,
@@ -497,8 +575,15 @@ class Diffeomorphism(Map):
         jacobian: bool = True,
         hessian: bool = False,
         trajectory: bool = False,
+        parameter_jacobian: bool = False,
     ) -> MapResult:
         """Compute the ``n``-th image of ``y0``; see :meth:`Map.image_detail`."""
         return self._pmap.image_detail(
-            y0, params, n, jacobian=jacobian, hessian=hessian, trajectory=trajectory
+            y0,
+            params,
+            n,
+            jacobian=jacobian,
+            hessian=hessian,
+            trajectory=trajectory,
+            parameter_jacobian=parameter_jacobian,
         )

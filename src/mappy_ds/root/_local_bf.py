@@ -41,26 +41,85 @@ class LocalBfResult(CycleResult):
     theta: float | None
 
 
-def _local_bf_condition(
+def _cofactor(a: np.ndarray) -> np.ndarray:
+    """Cofactor matrix ``C`` of ``a`` (so that ``d det(a) = Σ C_ij da_ij``).
+
+    Computed from minors, which stays well defined where ``a`` is singular —
+    exactly the situation at a bifurcation point, where ``det(a) = 0`` and
+    the identity ``C = det(a) a⁻ᵀ`` breaks down.
+    """
+    d = a.shape[0]
+    if d == 1:
+        return np.ones((1, 1), dtype=a.dtype)
+    c = np.empty_like(a)
+    for i in range(d):
+        rows = np.delete(np.arange(d), i)
+        for j in range(d):
+            cols = np.delete(np.arange(d), j)
+            c[i, j] = (-1) ** (i + j) * np.linalg.det(a[np.ix_(rows, cols)])
+    return c
+
+
+def _local_bf_system(
     diffeo: Map,
     var: State,
     params: dict[str, Any],
     param_key: str,
     period: int,
-) -> State:
+) -> tuple[State, np.ndarray]:
+    r"""Residual and Jacobian of the local-bifurcation system.
+
+    Unknowns are ``var = (y, λ, θ)`` with ``λ = params[param_key]``. The
+    residual is ``(T(y) - y, Re det A, Im det A)`` with
+    ``A = DT(y) - e^{iθ} I``. Its Jacobian uses the map's Jacobian, Hessian
+    and parameter derivative; only ``∂(DT)/∂λ``, which enters the determinant
+    rows, is approximated by a central difference (two extra map
+    evaluations), because second derivatives with respect to parameters are
+    not available.
+    """
     dim = var.size - 2
     y = var[:dim]
-    p = dict(params)
-    p[param_key] = float(var[dim])
+    lam = float(var[dim])
     theta = float(var[dim + 1])
-    res = diffeo.image_detail(y, p, period, jacobian=True)
-    assert res.jac is not None
-    det = np.linalg.det(res.jac - np.exp(1j * theta) * np.eye(dim))
+    p = dict(params)
+    p[param_key] = lam
+    res = diffeo.image_detail(
+        y, p, period, jacobian=True, hessian=True, parameter_jacobian=True
+    )
+    assert res.jac is not None and res.hes is not None and res.jac_p is not None
+    jac, hes = res.jac, res.hes
+    mu = np.exp(1j * theta)
+    a = jac - mu * np.eye(dim)
+    det = np.linalg.det(a)
+    cof = _cofactor(a)
+
     out = np.empty(dim + 2)
     out[:dim] = res.y - y
     out[dim] = det.real
     out[dim + 1] = det.imag
-    return out
+
+    # ∂(DT)/∂λ by a central difference
+    h = 1e-6 * max(1.0, abs(lam))
+    jac_plus = diffeo.image_detail(y, {**p, param_key: lam + h}, period).jac
+    jac_minus = diffeo.image_detail(y, {**p, param_key: lam - h}, period).jac
+    assert jac_plus is not None and jac_minus is not None
+    djac_dlam = (jac_plus - jac_minus) / (2 * h)
+
+    ddet_dy = np.einsum("ij,ijk->k", cof, hes)  # ∂A_ij/∂y_k = hes[i, j, k]
+    ddet_dlam = np.sum(cof * djac_dlam)
+    ddet_dtheta = -1j * mu * np.trace(cof)  # ∂A/∂θ = -i e^{iθ} I
+
+    jacobian = np.zeros((dim + 2, dim + 2))
+    jacobian[:dim, :dim] = jac - np.eye(dim)
+    if param_key in res.param_keys:
+        jacobian[:dim, dim] = res.jac_p[:, res.param_keys.index(param_key)]
+    jacobian[dim, :dim] = ddet_dy.real
+    jacobian[dim + 1, :dim] = ddet_dy.imag
+    jacobian[dim, dim] = ddet_dlam.real
+    jacobian[dim + 1, dim] = ddet_dlam.imag
+    jacobian[dim, dim + 1] = ddet_dtheta.real
+    jacobian[dim + 1, dim + 1] = ddet_dtheta.imag
+    return out, jacobian
 
 
 def find_local_bf(
@@ -93,9 +152,10 @@ def find_local_bf(
     * any other value: Neimark–Sacker bifurcation, a complex-conjugate pair of
       multipliers :math:`e^{\pm i\theta}` on the unit circle.
 
-    The Jacobian of this system is approximated by
-    :func:`scipy.optimize.root`, because the derivative of the map with
-    respect to the parameter is not available.
+    The Jacobian of this system is supplied analytically from the map's
+    Jacobian, Hessian and parameter derivative (:attr:`MapResult.jac_p
+    <mappy_ds.MapResult.jac_p>`); only the derivative of the determinant
+    with respect to the parameter uses a central difference of ``DTⁿ``.
 
     Parameters
     ----------
@@ -129,10 +189,10 @@ def find_local_bf(
     base = dict(params)
     var0 = np.concatenate([_y0, [float(base[param_key]), float(theta)]])
 
-    def objective(var: State) -> State:
-        return _local_bf_condition(diffeo, var, base, param_key, period)
+    def objective(var: State) -> tuple[State, np.ndarray]:
+        return _local_bf_system(diffeo, var, base, param_key, period)
 
-    sol = root(objective, var0, **root_options)
+    sol = root(objective, var0, jac=True, **root_options)
     success = bool(sol.success)
     y1: State | None = None
     p1: dict[str, Any] | None = None
@@ -144,7 +204,12 @@ def find_local_bf(
         p1 = dict(base)
         p1[param_key] = float(x[dim])
         theta1 = float(x[dim + 1])
-        detail = diffeo.image_detail(y1, p1, period, jacobian=True)
+        # Same request as inside the objective, so that the multipliers are
+        # consistent with the system that was solved (the variational
+        # equations change the step sequence of the ODE solver).
+        detail = diffeo.image_detail(
+            y1, p1, period, jacobian=True, hessian=True, parameter_jacobian=True
+        )
         eigvals, eigvecs = detail.eigvals, detail.eigvecs
     return LocalBfResult(
         success=success,

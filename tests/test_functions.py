@@ -268,3 +268,42 @@ def test_function_shared_by_two_modes(henon_fun, henon_params):
 def test_repr(henon_fun):
     assert "henon" in repr(henon_fun)
     assert "dom_dim=2" in repr(henon_fun)
+
+
+# -- parameter Jacobian -------------------------------------------------------
+
+
+def test_parameter_jacobian_henon(henon_fun, henon_params):
+    y = np.array([0.3, -0.2])
+    jp = henon_fun.parameter_jacobian(y, henon_params)
+    assert henon_fun.param_keys == ("a", "b")
+    assert jp.shape == (2, 2)
+    assert_allclose(jp[:, 0], [-(y[0] ** 2), 0.0])  # d/da
+    assert_allclose(jp[:, 1], [0.0, y[0]])  # d/db
+
+
+def test_parameter_jacobian_without_parameters():
+    @mapping(2)
+    def f(y, _):
+        return np.array([y[1], -y[0]])
+
+    jp = f.parameter_jacobian([1.0, 2.0])
+    assert jp.shape == (2, 0)
+    assert f.eval_parameter_jacobian_for(
+        np.array([1.0, 2.0]), np.empty(0), ("k",)
+    ).tolist() == [
+        [0.0],
+        [0.0],
+    ]
+
+
+def test_parameter_jacobian_for_scatters_columns(henon_fun, henon_params):
+    y = np.array([0.3, -0.2])
+    p = henon_fun.params_array(henon_params)
+    out = henon_fun.eval_parameter_jacobian_for(y, p, ("zzz", "b", "a"))
+    assert out.shape == (2, 3)
+    assert_allclose(out[:, 0], 0.0)
+    assert_allclose(out[:, 1], [0.0, y[0]])
+    assert_allclose(out[:, 2], [-(y[0] ** 2), 0.0])
+    # a key the function reads but that is not requested is held fixed
+    assert henon_fun.eval_parameter_jacobian_for(y, p, ("b",)).shape == (2, 1)

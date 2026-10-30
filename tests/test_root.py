@@ -307,3 +307,47 @@ def test_doctests(module):
         importlib.import_module(module), optionflags=doctest.NORMALIZE_WHITESPACE
     )
     assert result.failed == 0
+
+
+# -- analytic Jacobian of the local-bifurcation system -----------------------------
+
+
+def _check_system_jacobian(diffeo, var, params, key, period=1, h=1e-6, **tol):
+    from mappy_ds.root._local_bf import _local_bf_system
+
+    f0, jac = _local_bf_system(diffeo, var, params, key, period)
+    fd = np.zeros_like(jac)
+    for k in range(var.size):
+        e = np.zeros_like(var)
+        e[k] = h
+        fp = _local_bf_system(diffeo, var + e, params, key, period)[0]
+        fm = _local_bf_system(diffeo, var - e, params, key, period)[0]
+        fd[:, k] = (fp - fm) / (2 * h)
+    assert f0.shape == (var.size,)
+    assert_allclose(jac, fd, **tol)
+
+
+def test_local_bf_system_jacobian_henon(henon_map):
+    params = {"a": 0.35, "b": 0.3}
+    fp = find_cycle(henon_map, [0.5, 0.15], params).y
+    var = np.concatenate([fp, [params["a"], np.pi]])
+    _check_system_jacobian(henon_map, var, params, "a", rtol=1e-6, atol=1e-8)
+
+
+def test_local_bf_system_jacobian_izhikevich(izh_trace):
+    mu = np.array([s.info["eigvals"][0].real for s in izh_trace])
+    start = izh_trace[int(np.argmin(np.abs(mu + 1)))]
+    pmap = make_izhikevich_map(rtol=1e-10, atol=1e-12)
+    var = np.concatenate([start.y, [start.params["I"], np.pi]])
+    _check_system_jacobian(pmap, var, start.params, "I", rtol=1e-4, atol=1e-6)
+
+
+def test_cofactor_matches_determinant_derivative():
+    from mappy_ds.root._local_bf import _cofactor
+
+    rng = np.random.default_rng(0)
+    a = rng.normal(size=(3, 3)) + 1j * rng.normal(size=(3, 3))
+    cof = _cofactor(a)
+    # Jacobi's formula: d det(a) = sum(C * da); also C = det(a) a^{-T}
+    assert_allclose(cof, np.linalg.det(a) * np.linalg.inv(a).T, rtol=1e-10)
+    assert_allclose(_cofactor(np.array([[5.0]])), [[1.0]])

@@ -295,3 +295,61 @@ def test_borderless_mode_default_tolerance():
     y0 = np.array([1.0, 0.5])
     res = mode.step(y0, jacobian=True)
     assert_allclose(res.jac, expm(A_LIN), atol=1e-5)
+
+
+# -- parameter derivatives ----------------------------------------------------
+
+
+def _fd_param(step, y0, params, keys, h=1e-6):
+    cols = []
+    for k in keys:
+        up = step(y0, {**params, k: params[k] + h}).y
+        dn = step(y0, {**params, k: params[k] - h}).y
+        cols.append((up - dn) / (2 * h))
+    return np.column_stack(cols)
+
+
+def test_discrete_mode_parameter_jacobian():
+    from conftest import firing
+
+    mode = DiscreteMode("B", firing)
+    params = {"c": -50.0, "d": 2.0, "unused": 1.0}
+    res = mode.step([30.0, -1.0], params, param_keys=("d", "unused", "c"))
+    assert res.jac_p is not None and res.jac_p.shape == (2, 3)
+    assert_allclose(res.jac_p, [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
+    assert mode.step([30.0, -1.0], params).jac_p is None
+
+
+def test_continuous_mode_parameter_jacobian_matches_fd(izh_mode_tight, izh_params):
+    y0 = np.array([-50.0, -1.7])
+    keys = ("a", "b", "I")
+    res = izh_mode_tight.step(y0, izh_params, param_keys=keys)
+    assert res.jac_p is not None and res.jac_p.shape == (2, 3)
+    assert res.jac is not None  # implied by param_keys
+    fd = _fd_param(izh_mode_tight.step, y0, izh_params, keys)
+    assert_allclose(res.jac_p, fd, rtol=1e-5, atol=1e-6)
+
+
+def test_parameter_jacobian_with_parametrised_border():
+    """ẏ = (1, p y0) stopped at y0 = c: T(y) = (c, y1 + p c²/2 - p y0²/2)."""
+
+    @vector_field(2)
+    def field(y, p):
+        return np.array([1, p["p"] * y[0]])
+
+    @border(2)
+    def stop(y, p):
+        return y[0] - p["c"]
+
+    mode = ContinuousMode("flow", field, borders=[stop], rtol=1e-10, atol=1e-12)
+    params = {"p": 0.7, "c": 2.0}
+    y0 = np.array([0.5, -1.0])
+    res = mode.step(y0, params, param_keys=("p", "c"))
+    c, p = params["c"], params["p"]
+    expected_y = [c, y0[1] + p * (c**2 - y0[0] ** 2) / 2]
+    assert_allclose(res.y, expected_y, rtol=1e-8)
+    expected_jac_p = [[0.0, 1.0], [(c**2 - y0[0] ** 2) / 2, p * c]]
+    assert_allclose(res.jac_p, expected_jac_p, rtol=1e-7, atol=1e-9)
+    # the hitting time depends on c only through the border: without the
+    # correction term the derivative with respect to c would vanish
+    assert res.jac_p[0, 1] == pytest.approx(1.0, rel=1e-8)
