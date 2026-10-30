@@ -20,6 +20,7 @@ Periodic points
 
    find_cycle
    trace_cycle
+   trace_cycle_arclength
    CycleResult
 
 Local bifurcations

@@ -89,6 +89,95 @@ The multiplier approaches :math:`-1`: a period-doubling bifurcation is near.
    one status line per step, or a ``callback`` to receive each step as soon
    as it is found.
 
+Through folds: ``trace_cycle_arclength``
+========================================
+
+:func:`~mappy_ds.root.trace_cycle` prescribes the parameter values, so it
+fails where a branch of periodic points turns back in the parameter — at a
+*fold* (saddle-node bifurcation) the periodic point simply ceases to exist
+beyond the turning point, and the root finder cannot converge.
+:func:`~mappy_ds.root.trace_cycle_arclength` instead treats
+:math:`u = (\bm y, \lambda)` as a point on the curve
+
+.. math::
+
+   F(u) = T^n(\bm y, \lambda) - \bm y = 0
+
+and advances along the curve itself (pseudo-arclength continuation, Keller
+1977 — the method behind AUTO and MatCont). From the current point
+:math:`u_k` with unit tangent :math:`t_k` it predicts :math:`u_k + h\, t_k`
+and corrects with Newton's method on the bordered system
+
+.. math::
+
+   F(u) = 0, \qquad t_k \cdot (u - u_k) - h = 0,
+
+whose Jacobian :math:`\begin{pmatrix} DT^n - I & \partial T^n/\partial\lambda
+\\ t_k^{\mathsf T} \end{pmatrix}` stays regular at a fold, where
+:math:`DT^n - I` alone is singular. Both blocks are available analytically
+(:attr:`~mappy_ds.MapResult.jac`, :attr:`~mappy_ds.MapResult.jac_p`), the
+tangent is the null vector of the top block, and the orientation is kept by
+:math:`t_k \cdot t_{k+1} > 0`. The arclength step :math:`h` grows when the
+corrector converges in a couple of iterations and is halved when it fails.
+
+.. code-block:: python
+
+   >>> from mappy_ds.root import trace_cycle_arclength
+   >>> branch = trace_cycle_arclength(
+   ...     pmap, cycle.y, params, "I", direction=-1, bounds=(4.5, 8.0),
+   ...     step=0.1, step_max=0.5,
+   ... )
+   >>> [s.params["I"] for s in branch][:3]
+   [8.0, 7.9000..., 7.75...]
+
+``direction`` chooses the initial sense of :math:`\lambda`; ``bounds`` stops
+the continuation when :math:`\lambda` leaves an interval, and ``max_steps``
+bounds the number of points. The continuation also stops when the curve
+closes on itself or when the step would fall below ``step_min``.
+
+Folds are passed, not treated specially; but they, and the other local
+bifurcations, are *detected* from sign changes between consecutive points
+and recorded in ``info["events"]`` of the later point:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 45 30
+
+   * - event
+     - test
+     - refine with
+   * - ``"fold"``
+     - the parameter component of the tangent changes sign
+     - ``find_local_bf(..., theta=0)``
+   * - ``"branch_point"``
+     - :math:`\det(DT^n - I)` changes sign without a fold (transcritical or
+       pitchfork; the continuation follows one of the branches)
+     - —
+   * - ``"period_doubling"``
+     - :math:`\det(DT^n + I)` changes sign
+     - ``find_local_bf(..., theta=pi)``
+   * - ``"neimark_sacker"``
+     - a complex pair of multipliers crosses the unit circle
+     - ``find_local_bf(..., theta=arg mu)``
+
+.. code-block:: python
+
+   >>> pd = next(s for s in branch if "period_doubling" in s.info["events"])
+   >>> bf = find_local_bf(pmap, pd.y, pd.params, "I", np.pi)
+   >>> round(bf.params["I"], 4)
+   4.5869
+
+.. note::
+
+   The arclength is measured in the Euclidean metric of :math:`(\bm y,
+   \lambda)`. If the state components are orders of magnitude larger than
+   the parameter, almost all of a step is spent on the state and the
+   parameter barely moves; choose ``step`` with the parameter scale in mind
+   or rescale the parameter in the system functions. Switching to the next
+   branch at a period doubling (period :math:`2n`) is not automatic: start
+   a new continuation with ``period=2 * n`` from a point slightly past the
+   event.
+
 Local bifurcations: ``find_local_bf``
 =====================================
 

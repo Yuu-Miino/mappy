@@ -10,8 +10,10 @@ from numpy.testing import assert_allclose
 
 import mappy_ds.continuation as continuation_module
 from mappy_ds.continuation import (
+    ArclengthPoint,
     ContinuationStep,
     StepFunctionResult,
+    arclength_continuation,
     continuation,
 )
 
@@ -173,3 +175,103 @@ def test_doctest():
     )
     assert result.attempted > 0
     assert result.failed == 0
+
+
+# -- pseudo-arclength continuation ---------------------------------------------
+
+
+def circle(u):
+    return np.array([u @ u - 1.0]), 2.0 * u[np.newaxis, :]
+
+
+def test_arclength_circle_is_closed_and_passes_folds():
+    pts = arclength_continuation(circle, [1.0, 0.0], step=0.3, step_max=0.3)
+    assert 15 < len(pts) < 40
+    for p in pts:
+        assert abs(p.u @ p.u - 1.0) < 1e-9
+        assert abs(np.linalg.norm(p.tangent) - 1.0) < 1e-12
+        assert abs(p.tangent @ p.u) < 1e-8  # tangent to the circle
+    assert pts[1].u[1] > 0  # direction=+1: last component increases first
+    # the parameter component of the tangent changes sign twice (two folds)
+    signs = np.sign([p.tangent[1] for p in pts])
+    assert np.sum(signs[1:] != signs[:-1]) == 2
+    # stopped because the curve closed on itself, not because of max_steps
+    assert np.linalg.norm(pts[-1].u - pts[0].u) < 0.5
+
+
+def test_arclength_direction_and_bounds():
+    pts = arclength_continuation(
+        circle, [1.0, 0.0], step=0.1, step_max=0.1, direction=-1, bounds=(-0.5, 1.0)
+    )
+    assert pts[1].u[1] < 0
+    assert all(p.u[1] >= -0.5 for p in pts)
+    assert pts[-1].u[1] < -0.3  # stopped at the lower bound, not earlier
+
+
+def test_arclength_corrects_starting_point_with_parameter_fixed():
+    pts = arclength_continuation(circle, [0.7, 0.3], step=0.1, max_steps=0)
+    assert len(pts) == 1
+    assert pts[0].u[1] == pytest.approx(0.3)
+    assert pts[0].u[0] == pytest.approx(np.sqrt(1 - 0.09))
+    assert pts[0].step == 0.0
+
+
+def test_arclength_passes_saddle_node_fold():
+    # fixed points of y -> y + p - y^2: the curve p = y^2 folds at (0, 0)
+    def system(u):
+        y, p = u
+        return np.array([p - y * y]), np.array([[-2.0 * y, 1.0]])
+
+    pts = arclength_continuation(
+        system, [0.5, 0.25], step=0.05, step_max=0.1, direction=-1, bounds=(-1, 0.3)
+    )
+    ys = np.array([p.u[0] for p in pts])
+    ps = np.array([p.u[1] for p in pts])
+    assert_allclose(ps, ys**2, atol=1e-9)
+    assert ps.min() < 0.01  # reached the fold
+    assert ys[-1] < -0.3 and ps[-1] > 0.1  # and continued on the other branch
+
+
+def test_arclength_step_adapts_and_retries():
+    calls = {"n": 0}
+
+    def system(u):
+        calls["n"] += 1
+        if u[1] > 0.6 and calls["n"] % 7 == 0:
+            raise np.linalg.LinAlgError("pretend the map failed here")
+        return circle(u)
+
+    pts = arclength_continuation(
+        system, [1.0, 0.0], step=0.05, step_min=1e-4, step_max=0.4, bounds=(-2, 0.9)
+    )
+    steps = [p.step for p in pts[1:]]
+    assert max(steps) > 0.05  # grew
+    assert min(steps) > 0  # never below step_min
+    for p in pts:
+        assert abs(p.u @ p.u - 1.0) < 1e-9
+
+
+def test_arclength_invalid_arguments():
+    with pytest.raises(ValueError):
+        arclength_continuation(circle, [1.0], step=0.1)
+    with pytest.raises(ValueError):
+        arclength_continuation(circle, [1.0, 0.0], direction=2)
+    with pytest.raises(ValueError):
+        arclength_continuation(circle, [1.0, 0.0], step=1.0, step_max=0.1)
+
+
+def test_arclength_callback_receives_every_point():
+    seen: list[ArclengthPoint] = []
+    pts = arclength_continuation(
+        circle, [1.0, 0.0], step=0.3, step_max=0.3, callback=seen.append
+    )
+    assert len(seen) == len(pts)
+    assert all(a is b for a, b in zip(seen, pts, strict=True))
+
+
+def test_arclength_uncorrectable_start_raises():
+    def nowhere(u):
+        return np.array([u @ u + 1.0]), 2.0 * u[np.newaxis, :]
+
+    with pytest.raises(RuntimeError, match="starting point"):
+        arclength_continuation(nowhere, [1.0, 0.0])

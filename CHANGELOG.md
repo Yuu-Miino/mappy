@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   correction (including borders that depend on parameters) and the chain
   rule across modes. `Mode.step` takes `param_keys=` and returns
   `StepResult.jac_p`; `SystemFunction` gains `parameter_jacobian()`.
+- Pseudo-arclength continuation: `mappy_ds.continuation.arclength_continuation`
+  (generic predictor–corrector on a bordered system, adaptive step, fold
+  passing, closed-curve detection) and `mappy_ds.root.trace_cycle_arclength`,
+  which follows a branch of periodic points through folds using `jac` and
+  `jac_p` for the tangent, and flags `fold`, `branch_point`,
+  `period_doubling` and `neimark_sacker` events from sign changes between
+  consecutive points.
 - `find_local_bf` solves with an analytic Jacobian of the bifurcation system
   (Jacobian, Hessian and `jac_p` of the map; only the parameter derivative of
   `DTⁿ` uses a central difference).

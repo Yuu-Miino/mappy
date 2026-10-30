@@ -15,10 +15,18 @@ from dataclasses import dataclass, field
 from typing import Any, Generic, TypeVar
 
 import numpy as np
+import numpy.typing as npt
 
 from ._typing import Params
+from .exceptions import MappyError
 
-__all__ = ["ContinuationStep", "StepFunctionResult", "continuation"]
+__all__ = [
+    "ArclengthPoint",
+    "ContinuationStep",
+    "StepFunctionResult",
+    "arclength_continuation",
+    "continuation",
+]
 
 T = TypeVar("T")
 
@@ -172,3 +180,256 @@ def continuation(
         if show_progress:
             print(file=sys.stderr)
     return found
+
+
+@dataclass
+class ArclengthPoint:
+    """One accepted point of :func:`arclength_continuation`.
+
+    Attributes
+    ----------
+    u : numpy.ndarray
+        The point on the solution curve, shape ``(m + 1,)``.
+    tangent : numpy.ndarray
+        Unit tangent of the curve at ``u`` in the direction of travel.
+    step : float
+        Arclength step that led to this point (``0`` for the first point).
+    newton_iterations : int
+        Newton iterations the corrector needed.
+    """
+
+    u: np.ndarray
+    tangent: np.ndarray
+    step: float
+    newton_iterations: int
+
+
+#: ``fun(u) -> (F, J)`` with ``F`` of shape ``(m,)`` and ``J`` of shape
+#: ``(m, m + 1)``: the system whose zero set is a curve in ``R^{m+1}``.
+ArclengthSystem = Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]]
+
+
+def _tangent(
+    jac: np.ndarray, previous: np.ndarray | None, direction: int
+) -> np.ndarray:
+    """Return the unit null vector of ``jac`` oriented like ``previous``.
+
+    With a previous tangent the bordered system ``[J; previousᵀ] t = e_last``
+    is solved, which keeps the orientation; without one the null vector comes
+    from the SVD and is oriented so that its last component has the sign of
+    ``direction``.
+    """
+    m = jac.shape[0]
+    if previous is not None:
+        bordered = np.vstack([jac, previous[np.newaxis, :]])
+        rhs = np.zeros(m + 1)
+        rhs[-1] = 1.0
+        t = np.linalg.solve(bordered, rhs)
+    else:
+        _, _, vt = np.linalg.svd(jac)
+        t = vt[-1]
+        if t[-1] * direction < 0:
+            t = -t
+    return t / np.linalg.norm(t)
+
+
+def arclength_continuation(
+    fun: ArclengthSystem,
+    u0: npt.ArrayLike,
+    *,
+    step: float = 0.01,
+    step_min: float = 1e-6,
+    step_max: float = 0.1,
+    max_steps: int = 1000,
+    direction: int = 1,
+    bounds: tuple[float, float] | None = None,
+    newton_tol: float = 1e-10,
+    newton_max_iter: int = 10,
+    callback: Callable[[ArclengthPoint], None] | None = None,
+) -> list[ArclengthPoint]:
+    r"""Follow a solution curve of ``F(u) = 0`` by pseudo-arclength continuation.
+
+    ``F : R^{m+1} → R^m`` has a one-dimensional zero set. Starting from
+    ``u0`` (which is first corrected onto the curve with its last component
+    held fixed), each step predicts ``u = u_k + h t_k`` along the unit
+    tangent ``t_k`` and corrects it with Newton's method on the bordered
+    system
+
+    .. math::
+
+       F(u) = 0, \qquad t_k \cdot (u - u_k) - h = 0,
+
+    whose Jacobian ``[J; t_kᵀ]`` is regular even where ``J`` loses rank in
+    the parameter direction, so folds (turning points) are passed without
+    special treatment (Keller, 1977). The step ``h`` grows by 1.5 when Newton
+    converges in at most three iterations, is halved when six or more are
+    needed or when it fails, and the orientation is kept by requiring
+    ``t_k · t_{k+1} > 0``.
+
+    Parameters
+    ----------
+    fun : callable
+        ``fun(u) -> (F, J)`` returning the residual ``(m,)`` and its Jacobian
+        ``(m, m + 1)`` at ``u``. It may raise :class:`~mappy_ds.MappyError`
+        or ``numpy.linalg.LinAlgError`` to signal that ``u`` is not
+        evaluable; the step is then retried with a smaller ``h``.
+    u0 : array_like
+        Starting point, shape ``(m + 1,)``; its last component is the
+        parameter-like coordinate used by ``direction`` and ``bounds``.
+    step : float, optional
+        Initial arclength step (Euclidean distance in the ``u`` space), by
+        default ``0.01``.
+    step_min, step_max : float, optional
+        Bounds of the adaptive step, by default ``1e-6`` and ``0.1``. The
+        continuation stops when a step below ``step_min`` would be needed.
+    max_steps : int, optional
+        Maximum number of accepted points after the first, by default
+        ``1000``.
+    direction : int, optional
+        ``+1`` to start with the last component of ``u`` increasing, ``-1``
+        decreasing, by default ``1``.
+    bounds : tuple of float, optional
+        Stop when the last component of ``u`` would leave ``[lo, hi]``; the
+        step is shortened so that the last accepted point lies close to the
+        boundary.
+    newton_tol : float, optional
+        Convergence tolerance of the corrector (on the Newton update relative
+        to ``1 + |u|`` and on ``|F|``), by default ``1e-10``.
+    newton_max_iter : int, optional
+        Maximum Newton iterations per step, by default ``10``.
+    callback : callable, optional
+        Called with each accepted :class:`ArclengthPoint`.
+
+    Returns
+    -------
+    list of ArclengthPoint
+        The accepted points in order, starting with the corrected ``u0``.
+        The list ends when ``bounds`` are left, ``max_steps`` is reached, the
+        step cannot be reduced further, or the curve closes on itself.
+
+    Notes
+    -----
+    The arclength is measured in the Euclidean metric of ``u``; if the state
+    and the parameter have very different scales, rescale the parameter in
+    ``fun`` (or choose ``step`` accordingly) so that progress along the
+    parameter is not starved.
+
+    Examples
+    --------
+    The unit circle ``u0² + u1² = 1`` traced from ``(1, 0)`` with ``u1``
+    increasing first; it is closed, so the continuation stops after one turn.
+
+    >>> import numpy as np
+    >>> from mappy_ds.continuation import arclength_continuation
+    >>> def circle(u):
+    ...     return np.array([u @ u - 1.0]), 2 * u[np.newaxis, :]
+    >>> pts = arclength_continuation(circle, [1.0, 0.0], step=0.3, step_max=0.3)
+    >>> all(abs(p.u @ p.u - 1) < 1e-9 for p in pts)
+    True
+    >>> pts[1].u[1] > 0 and 15 < len(pts) < 40
+    True
+    """
+    u = np.array(u0, dtype=np.float64)
+    if u.ndim != 1 or u.size < 2:
+        raise ValueError("u0 must be a vector of length m + 1 >= 2")
+    if direction not in (1, -1):
+        raise ValueError("direction must be +1 or -1")
+    if not (0 < step_min <= step <= step_max):
+        raise ValueError("need 0 < step_min <= step <= step_max")
+    m = u.size - 1
+
+    def corrector(
+        u_pred: np.ndarray, base: np.ndarray, t: np.ndarray, h: float
+    ) -> tuple[np.ndarray, np.ndarray, int] | None:
+        """Newton on the bordered system; ``None`` if it does not converge."""
+        x = u_pred.copy()
+        for k in range(1, newton_max_iter + 1):
+            res, jac = fun(x)
+            res = np.asarray(res, dtype=np.float64).reshape(m)
+            jac = np.asarray(jac, dtype=np.float64).reshape(m, m + 1)
+            g = np.append(res, t @ (x - base) - h)
+            bordered = np.vstack([jac, t[np.newaxis, :]])
+            dx = np.linalg.solve(bordered, -g)
+            x = x + dx
+            if np.linalg.norm(dx) <= newton_tol * (1.0 + np.linalg.norm(x)):
+                res, jac = fun(x)
+                res = np.asarray(res, dtype=np.float64).reshape(m)
+                jac = np.asarray(jac, dtype=np.float64).reshape(m, m + 1)
+                if np.linalg.norm(res) <= 100 * newton_tol * (1.0 + np.linalg.norm(x)):
+                    return x, jac, k
+                return None
+        return None
+
+    # Correct the starting point with its parameter held fixed.
+    e_last = np.zeros(m + 1)
+    e_last[-1] = 1.0
+    try:
+        start = corrector(u, u, e_last, 0.0)
+    except (MappyError, np.linalg.LinAlgError):
+        start = None
+    if start is None:
+        raise RuntimeError("the starting point could not be corrected onto the curve")
+    u, jac, iters = start
+    t = _tangent(jac, None, direction)
+    points = [ArclengthPoint(u, t, 0.0, iters)]
+    if callback is not None:
+        callback(points[0])
+
+    h = float(step)
+    u_start = u.copy()
+    for _ in range(max_steps):
+        accepted = None
+        while accepted is None:
+            if h < step_min:
+                return points
+            try:
+                accepted = corrector(u + h * t, u, t, h)
+            except (MappyError, np.linalg.LinAlgError):
+                accepted = None
+            if accepted is None:
+                h *= 0.5
+        u_new, jac_new, iters = accepted
+        if bounds is not None and not (bounds[0] <= u_new[-1] <= bounds[1]):
+            # Shrink the step so that the next point lands close to the
+            # boundary; give up after a few attempts (e.g. strong curvature).
+            landed = False
+            for _ in range(4):
+                target = bounds[0] if u_new[-1] < bounds[0] else bounds[1]
+                frac = (target - u[-1]) / (u_new[-1] - u[-1])
+                h = max(0.999 * frac * h, step_min)
+                if h <= step_min:
+                    break
+                try:
+                    accepted = corrector(u + h * t, u, t, h)
+                except (MappyError, np.linalg.LinAlgError):
+                    accepted = None
+                if accepted is None:
+                    break
+                u_new, jac_new, iters = accepted
+                if bounds[0] <= u_new[-1] <= bounds[1]:
+                    landed = True
+                    break
+            if not landed:
+                return points
+            bounds_hit = True
+        else:
+            bounds_hit = False
+        try:
+            t_new = _tangent(jac_new, t, direction)
+        except np.linalg.LinAlgError:
+            t_new = _tangent(jac_new, None, 1 if t[-1] >= 0 else -1)
+        point = ArclengthPoint(u_new, t_new, h, iters)
+        points.append(point)
+        if callback is not None:
+            callback(point)
+        if bounds_hit:
+            return points
+        # Closed curve: back at the start after having moved away from it.
+        if len(points) > 3 and np.linalg.norm(u_new - u_start) < 0.5 * h:
+            return points
+        u, t = u_new, t_new
+        if iters <= 3:
+            h = min(1.5 * h, step_max)
+        elif iters >= 6:
+            h = max(0.5 * h, step_min)
+    return points

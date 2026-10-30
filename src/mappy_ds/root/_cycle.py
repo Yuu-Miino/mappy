@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -11,10 +12,16 @@ import numpy.typing as npt
 from scipy.optimize import root
 
 from .._typing import Jacobian, Params, State, StateLike, as_state
-from ..continuation import ContinuationStep, StepFunctionResult, continuation
+from ..continuation import (
+    ArclengthPoint,
+    ContinuationStep,
+    StepFunctionResult,
+    arclength_continuation,
+    continuation,
+)
 from ..maps import Map
 
-__all__ = ["CycleResult", "find_cycle", "trace_cycle"]
+__all__ = ["CycleResult", "find_cycle", "trace_cycle", "trace_cycle_arclength"]
 
 
 @dataclass
@@ -210,3 +217,227 @@ def trace_cycle(
         show_progress=show_progress,
         callback=callback,
     )
+
+
+def _classify_events(
+    prev_tangent: np.ndarray,
+    tangent: np.ndarray,
+    prev_jac: Jacobian,
+    jac: Jacobian,
+    prev_eig: npt.NDArray[np.complex128],
+    eig: npt.NDArray[np.complex128],
+) -> tuple[str, ...]:
+    """Bifurcations between two consecutive points, from sign changes."""
+    dim = jac.shape[0]
+    eye = np.eye(dim)
+    events: list[str] = []
+    fold_turn = prev_tangent[-1] * tangent[-1] < 0
+    det_minus = np.linalg.det(prev_jac - eye) * np.linalg.det(jac - eye) < 0
+    if fold_turn:
+        events.append("fold")
+    elif det_minus:
+        events.append("branch_point")
+    if np.linalg.det(prev_jac + eye) * np.linalg.det(jac + eye) < 0:
+        events.append("period_doubling")
+    # A complex pair crossing the unit circle changes the number of
+    # multipliers outside it by two without det(J ∓ I) changing sign.
+    out_prev = int(np.sum(np.abs(prev_eig) > 1.0))
+    out_now = int(np.sum(np.abs(eig) > 1.0))
+    complex_now = np.any(np.abs(eig.imag) > 1e-12 * (1 + np.abs(eig.real)))
+    if abs(out_now - out_prev) == 2 and complex_now and not (fold_turn or det_minus):
+        events.append("neimark_sacker")
+    return tuple(events)
+
+
+def trace_cycle_arclength(
+    diffeo: Map,
+    y0: StateLike,
+    params: Params,
+    param_key: str,
+    *,
+    period: int = 1,
+    direction: int = 1,
+    bounds: tuple[float, float] | None = None,
+    step: float = 0.01,
+    step_min: float = 1e-6,
+    step_max: float = 0.1,
+    max_steps: int = 1000,
+    show_progress: bool = False,
+    callback: Callable[[ContinuationStep[State]], None] | None = None,
+) -> list[ContinuationStep[State]]:
+    r"""Follow a branch of periodic points by pseudo-arclength continuation.
+
+    Unlike :func:`trace_cycle`, which prescribes the parameter values, this
+    continuation treats the periodic point and the parameter together as a
+    point :math:`u = (\bm y, \lambda)` on the curve :math:`T^n(\bm y, \lambda)
+    - \bm y = 0` and advances along the curve itself, so folds (saddle-node
+    bifurcations), where the branch turns back in :math:`\lambda`, are
+    passed and the continuation carries on along the other side. The
+    tangent of the curve is the null vector of :math:`[DT^n - I \mid
+    \partial T^n/\partial\lambda]`, available analytically from
+    :attr:`MapResult.jac <mappy_ds.MapResult.jac>` and
+    :attr:`MapResult.jac_p <mappy_ds.MapResult.jac_p>`.
+
+    Bifurcations along the branch are detected from sign changes between
+    consecutive points and recorded in ``info["events"]`` of the later
+    point:
+
+    * ``"fold"`` — the tangent's parameter component changes sign;
+    * ``"branch_point"`` — ``det(DTⁿ - I)`` changes sign without a fold
+      (transcritical or pitchfork; the continuation follows one branch);
+    * ``"period_doubling"`` — ``det(DTⁿ + I)`` changes sign;
+    * ``"neimark_sacker"`` — a complex pair of multipliers crosses the unit
+      circle.
+
+    Refine an event with :func:`~mappy_ds.root.find_local_bf`, starting from
+    either of the two points and ``theta = 0`` (fold), ``pi`` (period
+    doubling) or the argument of the critical pair (Neimark–Sacker).
+
+    Parameters
+    ----------
+    diffeo : Map
+        The map.
+    y0 : array_like
+        Initial guess of the periodic point at ``params``.
+    params : mapping
+        Initial parameters; not modified.
+    param_key : str
+        Key of the continuation parameter :math:`\lambda`.
+    period : int, optional
+        Period of the cycle, by default ``1``.
+    direction : int, optional
+        ``+1`` to start with :math:`\lambda` increasing, ``-1`` decreasing;
+        by default ``1``.
+    bounds : tuple of float, optional
+        Stop when :math:`\lambda` leaves ``[lo, hi]``.
+    step, step_min, step_max : float, optional
+        Initial, minimum and maximum arclength step in the
+        :math:`(\bm y, \lambda)` space; see
+        :func:`~mappy_ds.continuation.arclength_continuation`.
+    max_steps : int, optional
+        Maximum number of points after the first, by default ``1000``.
+    show_progress : bool, optional
+        Print one line per accepted point to standard error.
+    callback : callable, optional
+        Called with each accepted :class:`~mappy_ds.ContinuationStep`.
+
+    Returns
+    -------
+    list of ContinuationStep
+        One step per accepted point, in order along the curve. ``y`` is the
+        periodic point, ``params`` holds the parameter value, and ``info``
+        holds ``eigvals``, ``eigvecs``, ``tangent`` (unit vector in the
+        :math:`(\bm y, \lambda)` space), ``step``, ``newton_iterations`` and
+        ``events``.
+
+    Raises
+    ------
+    ValueError
+        If the map does not depend on ``param_key``.
+
+    See Also
+    --------
+    trace_cycle : Natural-parameter continuation at prescribed values.
+    mappy_ds.continuation.arclength_continuation : The underlying algorithm.
+
+    Examples
+    --------
+    The fixed point of ``y ↦ y + p - y²`` exists for ``p ≥ 0`` only; both
+    fixed points ``±√p`` lie on one curve that folds at ``p = 0``. Starting
+    on the upper branch with ``p`` decreasing, the continuation passes the
+    fold and comes back along the lower branch:
+
+    >>> import numpy as np
+    >>> from mappy_ds import Diffeomorphism, mapping
+    >>> from mappy_ds.root import trace_cycle_arclength
+    >>> @mapping(1)
+    ... def f(y, p):
+    ...     return y + p["p"] - y**2
+    >>> steps = trace_cycle_arclength(
+    ...     Diffeomorphism(f), [0.5], {"p": 0.25}, "p", direction=-1,
+    ...     step=0.05, step_max=0.1, bounds=(-1.0, 0.25),
+    ... )
+    >>> any("fold" in s.info["events"] for s in steps)
+    True
+    >>> steps[-1].y[0] < 0 and steps[-1].params["p"] > 0
+    True
+    """
+    if param_key not in diffeo.param_keys:
+        raise ValueError(f"the map does not depend on parameter {param_key!r}")
+    col = diffeo.param_keys.index(param_key)
+    _y0 = as_state(y0)
+    dim = _y0.size
+    base = dict(params)
+    identity = np.eye(dim)
+    results: dict[int, Any] = {}  # cache of MapResult keyed by id of u
+
+    def system(u: np.ndarray) -> tuple[State, Jacobian]:
+        p = {**base, param_key: float(u[dim])}
+        res = diffeo.image_detail(
+            u[:dim], p, period, jacobian=True, parameter_jacobian=True
+        )
+        assert res.jac is not None and res.jac_p is not None
+        results.clear()
+        results[0] = res
+        return res.y - u[:dim], np.hstack([res.jac - identity, res.jac_p[:, [col]]])
+
+    steps: list[ContinuationStep[State]] = []
+    state: dict[str, Any] = {}
+
+    def on_point(point: ArclengthPoint) -> None:
+        # ``system`` was last evaluated at the accepted point by the corrector.
+        res = results[0]
+        assert res.jac is not None
+        eig, eigvec = res.eigvals, res.eigvecs
+        events: tuple[str, ...] = ()
+        if steps:
+            events = _classify_events(
+                state["tangent"],
+                point.tangent,
+                state["jac"],
+                res.jac,
+                state["eig"],
+                eig,
+            )
+        state.update(tangent=point.tangent, jac=res.jac, eig=eig)
+        cs = ContinuationStep(
+            point.u[:dim].copy(),
+            {**base, param_key: float(point.u[dim])},
+            {
+                "eigvals": eig,
+                "eigvecs": eigvec,
+                "tangent": point.tangent,
+                "step": point.step,
+                "newton_iterations": point.newton_iterations,
+                "events": events,
+            },
+        )
+        steps.append(cs)
+        if callback is not None:
+            callback(cs)
+        if show_progress:
+            tag = f" {','.join(events)}" if events else ""
+            print(
+                f"ARCLENGTH {len(steps):5d} {param_key}={cs.params[param_key]:+.10g} "
+                f"h={point.step:.3g} y={cs.y}{tag}",
+                end="\r",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    try:
+        arclength_continuation(
+            system,
+            np.append(_y0, float(base[param_key])),
+            step=step,
+            step_min=step_min,
+            step_max=step_max,
+            max_steps=max_steps,
+            direction=direction,
+            bounds=bounds,
+            callback=on_point,
+        )
+    finally:
+        if show_progress:
+            print(file=sys.stderr)
+    return steps
