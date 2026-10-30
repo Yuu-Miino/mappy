@@ -1,17 +1,30 @@
-.. MapPy documentation master file, created by
-   sphinx-quickstart on Sat Feb 25 00:39:16 2023.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 :html_theme.sidebar_secondary.remove: true
 
-###################
-MapPy documentation
-###################
+######################
+mappy-ds documentation
+######################
 
 **Version**: |version|
 
-MapPy is the package including many useful tools to analyze the hybrid dynamical systems.
+**mappy-ds** computes Poincaré maps of smooth and non-smooth (hybrid)
+dynamical systems — ODEs with impacts, resets, switching or state jumps —
+together with their exact Jacobian matrices and Hessian tensors. A system is
+described as a set of smooth *modes* (continuous flows that stop on a border,
+and discrete maps) connected by transition rules; following the mode concept
+of Miino (NOLTA, 2024), the package composes them into a single
+diffeomorphism. On top of that it finds periodic points, locates tangent,
+period-doubling and Neimark–Sacker bifurcations, and continues both along
+parameters.
+
+.. code-block:: sh
+
+   pip install mappy-ds
+
+.. note::
+
+   The distribution is called ``mappy-ds`` and the import name is
+   ``mappy_ds``. The PyPI project named ``mappy`` is an unrelated package
+   (Python bindings of the minimap2 aligner).
 
 .. toctree::
    :hidden:
@@ -21,32 +34,33 @@ MapPy is the package including many useful tools to analyze the hybrid dynamical
    contents/user_guide
    contents/api-reference/index
 
-.. grid:: 2
+.. grid:: 1 1 3 3
+   :gutter: 2
 
    .. grid-item-card::
       :img-top: _static/icons/rocket-takeoff.svg
 
-      Getting Started
+      Getting started
       ^^^^^^^^^^^^^^^
 
-      Check out the Absolute Beginner's Guide. It contains an
-      introduction to MapPy's main concepts and links to additional tutorials.
+      Install the package and build, evaluate and analyse your first
+      Poincaré map — the Izhikevich neuron — in five minutes.
 
       .. button-ref:: contents/getting_started
          :expand:
          :color: secondary
          :click-parent:
 
-         To the absolute beginner's guide
+         To the tutorial
 
    .. grid-item-card::
       :img-top: _static/icons/book-half.svg
 
-      User Guide
+      User guide
       ^^^^^^^^^^
 
-      The user guide provides in-depth information on the key concepts of MapPy
-      with some academic references.
+      The mode concept, how derivatives are computed, periodic points,
+      bifurcations and continuation, plotting, and worked examples.
 
       .. button-ref:: contents/user_guide
          :expand:
@@ -58,26 +72,23 @@ MapPy is the package including many useful tools to analyze the hybrid dynamical
    .. grid-item-card::
       :img-top: _static/icons/code-slash.svg
 
-      API Reference
+      API reference
       ^^^^^^^^^^^^^
 
-      The reference guide contains a detailed description of the functions,
-      modules, and objects included in MapPy. The reference describes how the
-      methods work and which parameters can be used. It assumes that you have an
-      understanding of the key concepts.
+      Detailed description of every public function and class, its
+      parameters and its return values.
 
       .. button-ref:: contents/api-reference/index
          :expand:
          :color: secondary
          :click-parent:
 
-         To the reference guide
+         To the API reference
 
+Reference
+=========
 
-.. Indices and tables
-.. ==================
-
-.. * :ref:`genindex`
-.. * :ref:`modindex`
-.. * :ref:`search`
-
+Y. Miino, "Mode concept to construct diffeomorphisms representing
+smooth/non-smooth dynamical systems", *Nonlinear Theory and Its Applications,
+IEICE*, vol. 15, no. 2, pp. 284–298, 2024.
+`doi:10.1587/nolta.15.284 <https://doi.org/10.1587/nolta.15.284>`_

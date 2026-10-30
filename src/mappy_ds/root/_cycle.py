@@ -60,7 +60,7 @@ def find_cycle(
     """Find a periodic point of a map.
 
     Solves :math:`T^n(y) - y = 0` with :func:`scipy.optimize.root`, where
-    :math:`T` is ``map`` and :math:`n` is ``period``, using the analytic
+    :math:`T` is ``diffeo`` and :math:`n` is ``period``, using the analytic
     Jacobian :math:`DT^n(y) - I` provided by the map.
 
     Parameters

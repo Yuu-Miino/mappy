@@ -1,44 +1,33 @@
-.. _root:
+.. _api-root:
 
-.. module:: mappy.root
+=============================================
+Periodic points and bifurcations (``root``)
+=============================================
 
-====
-Root
-====
+.. module:: mappy_ds.root
 
-.. currentmodule:: mappy.root
+.. currentmodule:: mappy_ds.root
 
-Find cycles
------------
+Root finding for periodic points and local bifurcations of any
+:class:`~mappy_ds.Map`, and their continuation. See
+:doc:`/contents/user_guide/root_and_continuation` for a walkthrough.
 
-.. autosummary::
-    :toctree: generated/
-
-    find_cycle
-    trace_cycle
-
-Find Local Bifurcation Set
---------------------------
+Periodic points
+---------------
 
 .. autosummary::
-    :toctree: generated/
+   :toctree: generated/
 
-    find_local_bf
-    trace_local_bf
+   find_cycle
+   trace_cycle
+   CycleResult
 
-Result Classes
---------------
-
-.. autosummary::
-    :toctree: generated/
-
-    FindCycleResult
-    FindLocalBfResult
-
-Exceptions
-----------
+Local bifurcations
+------------------
 
 .. autosummary::
-    :toctree: generated/
+   :toctree: generated/
 
-    ParameterKeyError
+   find_local_bf
+   trace_local_bf
+   LocalBfResult

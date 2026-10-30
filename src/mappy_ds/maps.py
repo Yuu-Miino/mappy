@@ -175,8 +175,9 @@ class PoincareMap(Map):
         All modes of the system, with distinct names.
     transitions : mapping
         ``{mode_name: next_mode_name}`` for discrete modes and for continuous
-        modes with a single border, or ``{mode_name: [next, ...]}`` with one
-        entry per border for continuous modes.
+        modes with at most one border (a borderless mode ends at
+        ``max_interval``), or ``{mode_name: [next, ...]}`` with one entry per
+        border for continuous modes with several borders.
     initial_mode : str
         Mode the map starts in (the Poincaré section).
     end_modes : str or sequence of str, optional
@@ -357,7 +358,7 @@ class PoincareMap(Map):
 
 
 class Diffeomorphism(Map):
-    r"""A discrete map :math:`y \\mapsto f(y, p)` on :math:`\\mathbb{R}^n`.
+    r"""A discrete map :math:`y \mapsto f(y, p)` on :math:`\mathbb{R}^n`.
 
     Parameters
     ----------

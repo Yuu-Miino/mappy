@@ -205,9 +205,9 @@ class ContinuousMode(Mode):
 
     .. math::
 
-        \\dot J = D f(\\varphi)\\, J, \\qquad
-        \\dot H_{ijk} = \\sum_{l,m} (D^2 f)_{ilm} J_{lj} J_{mk}
-                        + \\sum_l (Df)_{il} H_{ljk}
+        \dot J = D f(\varphi)\, J, \qquad
+        \dot H_{ijk} = \sum_{l,m} (D^2 f)_{ilm} J_{lj} J_{mk}
+                        + \sum_l (Df)_{il} H_{ljk}
 
     are integrated along with the state, and the result is corrected for the
     dependence of the hitting time on the initial state (see the references).

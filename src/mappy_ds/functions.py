@@ -207,7 +207,7 @@ def _as_keys(param_keys: Iterable[str] | None) -> tuple[str, ...]:
 def vector_field(
     dim: int, param_keys: Sequence[str] | None = None
 ) -> Callable[[PyFunction], SystemFunction]:
-    r"""Declare the right-hand side of an ODE :math:`\\dot y = f(y, p)`.
+    r"""Declare the right-hand side of an ODE :math:`\dot y = f(y, p)`.
 
     Parameters
     ----------
@@ -239,7 +239,7 @@ def vector_field(
 def mapping(
     dom_dim: int, cod_dim: int | None = None, param_keys: Sequence[str] | None = None
 ) -> Callable[[PyFunction], SystemFunction]:
-    r"""Declare a discrete map :math:`y \\mapsto f(y, p)`.
+    r"""Declare a discrete map :math:`y \mapsto f(y, p)`.
 
     Parameters
     ----------
