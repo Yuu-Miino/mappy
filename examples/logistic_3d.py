@@ -51,7 +51,7 @@ PARAMS_ALT = {"alpha": 3.6324, "beta": 0.0193, "gamma": 0.0146}
 NON_INTERACTIVE_BACKENDS = ("agg", "pdf", "pgf", "ps", "svg", "cairo", "template")
 
 
-@mapping(3, 3, ["alpha", "beta", "gamma"])
+@mapping(3, 3)
 def logistic_3d(iny, param):
     x, y, z = iny
     alpha = param["alpha"]

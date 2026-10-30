@@ -59,7 +59,7 @@ NON_INTERACTIVE_BACKENDS = ("agg", "pdf", "pgf", "ps", "svg", "cairo", "template
 REFERENCE_PD = (0.171687, 0.368655)
 
 
-@vector_field(3, ["k", "B0", "B"])
+@vector_field(3)
 def duffing(iny, param):
     x, y, t = iny
     k = param["k"]

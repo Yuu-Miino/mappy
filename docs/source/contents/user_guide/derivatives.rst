@@ -41,8 +41,12 @@ Symbolic tracing of system functions
 The decorators :func:`~mappy_ds.vector_field`, :func:`~mappy_ds.mapping` and
 :func:`~mappy_ds.border` wrap a Python function ``f(y, p)`` into a
 :class:`~mappy_ds.SystemFunction`. On first use it calls ``f`` *once* with
-SymPy symbols ``y_0, y_1, ...`` for the state and one symbol per parameter
-key, and differentiates the resulting expression symbolically. The function,
+SymPy symbols ``y_0, y_1, ...`` for the state and a parameter mapping that
+hands out one symbol per key it is asked for — every ``p["a"]`` in the body
+records ``"a"`` in :attr:`~mappy_ds.SystemFunction.param_keys`, so parameters
+need no declaration (but must be read as ``p[key]``: ``p.get``, ``in`` and
+iteration are rejected) — and differentiates the resulting expression
+symbolically. The function,
 its Jacobian and its Hessian are then compiled with
 :func:`sympy.lambdify` into NumPy callables, which are what the integrator
 evaluates.
@@ -51,7 +55,7 @@ evaluates.
 
    >>> import numpy as np, sympy
    >>> from mappy_ds import vector_field
-   >>> @vector_field(dim=2, param_keys=["k"])
+   >>> @vector_field(dim=2)
    ... def pendulum(y, p):
    ...     return np.array([y[1], -p["k"] * y[1] - sympy.cos(y[0])])
    >>> pendulum.expression
@@ -82,7 +86,7 @@ the function is evaluated:
 
 .. code-block:: python
 
-   >>> @vector_field(dim=2, param_keys=["k"])
+   >>> @vector_field(dim=2)
    ... def bad(y, p):
    ...     return np.array([y[1], -p["k"] * y[1] - np.cos(y[0])])
    >>> bad([0.0, 0.0], {"k": 0.1})

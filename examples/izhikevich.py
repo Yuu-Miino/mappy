@@ -56,7 +56,7 @@ NON_INTERACTIVE_BACKENDS = ("agg", "pdf", "pgf", "ps", "svg", "cairo", "template
 
 
 ## Izhikevich neuron model
-@vector_field(2, ["a", "b", "I"])
+@vector_field(2)
 def izhikevich(y, param):
     v, u = y
     a = param["a"]
@@ -73,14 +73,14 @@ def fire_border(y, _):
 
 
 ## Firing jump
-@mapping(2, 2, ["c", "d"])
+@mapping(2, 2)
 def jump(y, param):
     C = np.array([-30 + param["c"], param["d"]])
     return y + C
 
 
 ## Dimension conversion (p: 1 -> 2, pinv: 2 -> 1)
-@mapping(1, 2, ["c"])
+@mapping(1, 2)
 def p(y, param):
     return np.array([0, 1]) * y + np.array([param["c"], 0])
 

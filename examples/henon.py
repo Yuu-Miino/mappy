@@ -34,7 +34,7 @@ PARAMS = {"a": 1.4, "b": 0.3}
 NON_INTERACTIVE_BACKENDS = ("agg", "pdf", "pgf", "ps", "svg", "cairo", "template")
 
 
-@mapping(2, 2, ["a", "b"])
+@mapping(2, 2)
 def henon(iny, param):
     x, y = iny
     a = param["a"]

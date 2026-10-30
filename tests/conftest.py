@@ -69,7 +69,7 @@ def fd_hessian(
 # ---------------------------------------------------------------------------
 
 
-@vector_field(dim=2, param_keys=["a", "b", "I"])
+@vector_field(dim=2)
 def izhikevich(y, p):
     v, u = y
     return np.array([0.04 * v**2 + 5 * v + 140 - u + p["I"], p["a"] * (p["b"] * v - u)])
@@ -80,7 +80,7 @@ def fire(y, _):
     return y[0] - 30
 
 
-@mapping(2, param_keys=["c", "d"])
+@mapping(2)
 def firing(y, p):
     return y + np.array([p["c"] - 30, p["d"]])
 
@@ -141,7 +141,7 @@ def izh_map_tight() -> PoincareMap:
 # ---------------------------------------------------------------------------
 
 
-@mapping(2, param_keys=["a", "b"])
+@mapping(2)
 def henon(y, p):
     x, u = y
     return np.array([1 - p["a"] * x**2 + u, p["b"] * x])
@@ -167,7 +167,7 @@ def henon_map() -> Diffeomorphism:
 # ---------------------------------------------------------------------------
 
 
-@vector_field(3, param_keys=["k", "B0", "B"])
+@vector_field(3)
 def duffing(y, p):
     x, v, t = y
     return np.array([v, -p["k"] * v - x**3 + p["B0"] + p["B"] * sympy.cos(t), 1])
@@ -255,7 +255,7 @@ def lower(y, _):
     return y[0] + 1
 
 
-@border(2, param_keys=["T"])
+@border(2)
 def sample(y, p):
     return y[1] - p["T"]
 

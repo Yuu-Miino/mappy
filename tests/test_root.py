@@ -30,7 +30,7 @@ def henon_pd_value(b):
     return 3 * (1 - b) ** 2 / 4
 
 
-@mapping(1, param_keys=["p"])
+@mapping(1)
 def saddle_node(x, p):
     return x + p["p"] - x**2
 

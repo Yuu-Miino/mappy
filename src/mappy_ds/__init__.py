@@ -14,7 +14,7 @@ The Izhikevich neuron model with a firing threshold at ``v = 30``:
 >>> import numpy as np
 >>> from mappy_ds import (ContinuousMode, DiscreteMode, PoincareMap,
 ...                       border, mapping, vector_field)
->>> @vector_field(dim=2, param_keys=["a", "b", "I"])
+>>> @vector_field(dim=2)
 ... def izhikevich(y, p):
 ...     v, u = y
 ...     return np.array([0.04 * v**2 + 5 * v + 140 - u + p["I"],
@@ -22,7 +22,7 @@ The Izhikevich neuron model with a firing threshold at ``v = 30``:
 >>> @border(dim=2)
 ... def fire(y, _):
 ...     return y[0] - 30
->>> @mapping(2, param_keys=["c", "d"])
+>>> @mapping(2)
 ... def firing(y, p):
 ...     return y + np.array([p["c"] - 30, p["d"]])
 >>> @mapping(2, 1)

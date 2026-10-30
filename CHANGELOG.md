@@ -20,12 +20,14 @@ unreleased `mappy` 0.0.x.
 - Dropped Python 3.10; supports 3.11–3.13. NumPy 2 compatible.
 - `src/` layout built with hatchling; `uv.lock` committed; ruff, mypy
   (`--strict`) and pytest configured in `pyproject.toml`.
-- System functions are declared with `@vector_field(dim, param_keys)`,
-  `@mapping(dom_dim, cod_dim, param_keys)` and `@border(dim, direction)`
+- System functions are declared with `@vector_field(dim)`,
+  `@mapping(dom_dim, cod_dim)` and `@border(dim, direction)`
   instead of `ContinuousMode.function` / `DiscreteMode.function` /
   `ContinuousMode.border`. They are traced once with SymPy and compiled to
   NumPy, so the function, its Jacobian and its Hessian are all fast; the same
-  `SystemFunction` can be shared by several modes.
+  `SystemFunction` can be shared by several modes. The parameters a function
+  reads (`p[key]`) are discovered during the trace, so there is no
+  `param_keys` declaration.
 - `ContinuousMode` and `DiscreteMode` expose one `step(y0, params, *,
   jacobian, hessian, trajectory)` returning a `StepResult` dataclass.
 - `PoincareMap(modes, transitions, initial_mode, end_modes=None)` fixes the

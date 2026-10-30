@@ -9,12 +9,13 @@ available as fast NumPy callables.
 
 Because the function is traced symbolically it must be *expressible with
 SymPy*: use ``sympy.cos`` rather than ``numpy.cos`` and avoid branching on the
-values of ``y``.
+values of ``y``. Parameters are read as ``p[key]``; the keys a function reads
+are recorded during the trace and become its :attr:`SystemFunction.param_keys`.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterator, Mapping
 from functools import cached_property
 from typing import Any
 
@@ -30,6 +31,46 @@ __all__ = ["SystemFunction", "border", "mapping", "vector_field"]
 PyFunction = Callable[[Any, Any], Any]
 
 
+class _ParamRecorder(Mapping[str, sympy.Symbol]):
+    """Parameter mapping handed to a function while it is traced.
+
+    Every ``p[key]`` returns the symbol of that parameter and records ``key``,
+    so the parameters a function depends on are discovered from its body.
+    Any other access (``get``, ``in``, iteration, ``len``) cannot be
+    reproduced at run time and is rejected.
+    """
+
+    def __init__(self) -> None:
+        self.symbols: dict[str, sympy.Symbol] = {}
+
+    def __getitem__(self, key: str) -> sympy.Symbol:
+        if not isinstance(key, str):
+            raise SymbolicEvaluationError(
+                f"parameter names must be strings, got {key!r}"
+            )
+        if key not in self.symbols:
+            self.symbols[key] = sympy.Symbol(key, real=True)
+        return self.symbols[key]
+
+    def _unsupported(self, what: str) -> SymbolicEvaluationError:
+        return SymbolicEvaluationError(
+            f"{what} is not supported on the parameters of a system function; "
+            "read parameters with p[key] only"
+        )
+
+    def __contains__(self, key: object) -> bool:
+        raise self._unsupported("`key in p`")
+
+    def __iter__(self) -> Iterator[str]:
+        raise self._unsupported("iterating over p")
+
+    def __len__(self) -> int:
+        raise self._unsupported("len(p)")
+
+    def get(self, key: str, default: Any = None, /) -> Any:
+        raise self._unsupported("p.get(...)")
+
+
 class SystemFunction:
     """A vector-valued function :math:`f(y, p)` with symbolic derivatives.
 
@@ -37,19 +78,23 @@ class SystemFunction:
     ----------
     fun : callable
         Python function ``fun(y, params)``. ``y`` is a one-dimensional array of
-        length ``dom_dim`` and ``params`` a mapping holding at least the keys in
-        ``param_keys`` (it is ``{}`` when ``param_keys`` is empty). The return
-        value must be convertible to a vector of length ``cod_dim``.
+        length ``dom_dim`` and ``params`` a mapping of parameter values that
+        must be read as ``params[key]``. The return value must be convertible
+        to a vector of length ``cod_dim``.
     dom_dim : int
         Dimension of the domain (length of ``y``).
     cod_dim : int
         Dimension of the codomain (length of the returned vector).
-    param_keys : iterable of str, optional
-        Names of the parameters ``fun`` reads from ``params``.
     direction : int, optional
         Only meaningful for border functions: direction of the zero crossing
         that terminates a continuous mode (``1``, ``-1`` or ``0`` for both),
         forwarded to :func:`scipy.integrate.solve_ivp` events.
+
+    Attributes
+    ----------
+    param_keys : tuple of str
+        Names of the parameters the function reads, in the order of first
+        access. Discovered by tracing the function.
 
     Notes
     -----
@@ -63,7 +108,6 @@ class SystemFunction:
         fun: PyFunction,
         dom_dim: int,
         cod_dim: int,
-        param_keys: Iterable[str] = (),
         direction: int = 0,
     ) -> None:
         if dom_dim < 1 or cod_dim < 1:
@@ -71,7 +115,6 @@ class SystemFunction:
         self.pyfunc = fun
         self.dom_dim = int(dom_dim)
         self.cod_dim = int(cod_dim)
-        self.param_keys: tuple[str, ...] = tuple(param_keys)
         self.direction = int(direction)
         self.__name__ = getattr(fun, "__name__", type(self).__name__)
         self.__doc__ = getattr(fun, "__doc__", None)
@@ -86,19 +129,12 @@ class SystemFunction:
     # -- symbolic tracing -------------------------------------------------
 
     @cached_property
-    def _symbols(self) -> tuple[list[sympy.Symbol], list[sympy.Symbol]]:
+    def _trace(self) -> tuple[sympy.Matrix, list[sympy.Symbol], list[sympy.Symbol]]:
+        """Trace the function once: expression, state symbols, parameter symbols."""
         y = list(sympy.symbols(f"y_0:{self.dom_dim}", real=True))
-        p = [sympy.Symbol(k, real=True) for k in self.param_keys]
-        return y, p
-
-    @cached_property
-    def expression(self) -> sympy.Matrix:
-        """Symbolic expression of the function as a ``cod_dim × 1`` matrix."""
-        y, p = self._symbols
-        y_arr = np.array(y, dtype=object)
-        p_map = dict(zip(self.param_keys, p, strict=True))
+        recorder = _ParamRecorder()
         try:
-            raw = self.pyfunc(y_arr, p_map)
+            raw = self.pyfunc(np.array(y, dtype=object), recorder)
             expr = sympy.Matrix(np.atleast_1d(np.asarray(raw, dtype=object)).ravel())
         except SymbolicEvaluationError:
             raise
@@ -111,7 +147,21 @@ class SystemFunction:
                 f"{self.__name__!r} returned {expr.shape[0]} components, "
                 f"expected cod_dim={self.cod_dim}"
             )
-        return expr
+        return expr, y, list(recorder.symbols.values())
+
+    @property
+    def param_keys(self) -> tuple[str, ...]:
+        """Names of the parameters the function reads (discovered by tracing)."""
+        return tuple(str(sym) for sym in self._trace[2])
+
+    @property
+    def _symbols(self) -> tuple[list[sympy.Symbol], list[sympy.Symbol]]:
+        return self._trace[1], self._trace[2]
+
+    @property
+    def expression(self) -> sympy.Matrix:
+        """Symbolic expression of the function as a ``cod_dim × 1`` matrix."""
+        return self._trace[0]
 
     @cached_property
     def jacobian_expression(self) -> sympy.Matrix:
@@ -196,31 +246,19 @@ class SystemFunction:
         )
 
 
-def _as_keys(param_keys: Iterable[str] | None) -> tuple[str, ...]:
-    if param_keys is None:
-        return ()
-    if isinstance(param_keys, str):
-        raise TypeError("param_keys must be a sequence of names, not a string")
-    return tuple(param_keys)
-
-
-def vector_field(
-    dim: int, param_keys: Sequence[str] | None = None
-) -> Callable[[PyFunction], SystemFunction]:
+def vector_field(dim: int) -> Callable[[PyFunction], SystemFunction]:
     r"""Declare the right-hand side of an ODE :math:`\dot y = f(y, p)`.
 
     Parameters
     ----------
     dim : int
         Dimension of the state space.
-    param_keys : sequence of str, optional
-        Names of the parameters used by the function.
 
     Examples
     --------
     >>> import numpy as np
     >>> from mappy_ds import vector_field
-    >>> @vector_field(dim=2, param_keys=["a", "b", "I"])
+    >>> @vector_field(dim=2)
     ... def izhikevich(y, p):
     ...     v, u = y
     ...     return np.array([0.04 * v**2 + 5 * v + 140 - u + p["I"],
@@ -231,13 +269,13 @@ def vector_field(
     """
 
     def decorator(fun: PyFunction) -> SystemFunction:
-        return SystemFunction(fun, dim, dim, _as_keys(param_keys))
+        return SystemFunction(fun, dim, dim)
 
     return decorator
 
 
 def mapping(
-    dom_dim: int, cod_dim: int | None = None, param_keys: Sequence[str] | None = None
+    dom_dim: int, cod_dim: int | None = None
 ) -> Callable[[PyFunction], SystemFunction]:
     r"""Declare a discrete map :math:`y \mapsto f(y, p)`.
 
@@ -247,14 +285,12 @@ def mapping(
         Dimension of the domain.
     cod_dim : int, optional
         Dimension of the codomain, by default equal to ``dom_dim``.
-    param_keys : sequence of str, optional
-        Names of the parameters used by the function.
 
     Examples
     --------
     >>> import numpy as np
     >>> from mappy_ds import mapping
-    >>> @mapping(2, param_keys=["a", "b"])
+    >>> @mapping(2)
     ... def henon(y, p):
     ...     x, u = y
     ...     return np.array([1 - p["a"] * x**2 + u, p["b"] * x])
@@ -263,24 +299,18 @@ def mapping(
     """
 
     def decorator(fun: PyFunction) -> SystemFunction:
-        return SystemFunction(
-            fun, dom_dim, dom_dim if cod_dim is None else cod_dim, _as_keys(param_keys)
-        )
+        return SystemFunction(fun, dom_dim, dom_dim if cod_dim is None else cod_dim)
 
     return decorator
 
 
-def border(
-    dim: int, param_keys: Sequence[str] | None = None, direction: int = 1
-) -> Callable[[PyFunction], SystemFunction]:
+def border(dim: int, direction: int = 1) -> Callable[[PyFunction], SystemFunction]:
     """Declare a border (section) :math:`b(y, p) = 0` of a continuous mode.
 
     Parameters
     ----------
     dim : int
         Dimension of the state space of the mode the border belongs to.
-    param_keys : sequence of str, optional
-        Names of the parameters used by the function.
     direction : int, optional
         Direction of the zero crossing that triggers the border: ``1`` for
         negative-to-positive, ``-1`` for positive-to-negative and ``0`` for
@@ -295,6 +325,6 @@ def border(
     """
 
     def decorator(fun: PyFunction) -> SystemFunction:
-        return SystemFunction(fun, dim, 1, _as_keys(param_keys), direction=direction)
+        return SystemFunction(fun, dim, 1, direction=direction)
 
     return decorator

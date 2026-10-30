@@ -139,7 +139,7 @@ class DiscreteMode(Mode):
     --------
     >>> import numpy as np
     >>> from mappy_ds import DiscreteMode, mapping
-    >>> @mapping(2, param_keys=["c", "d"])
+    >>> @mapping(2)
     ... def fire(y, p):
     ...     return y + np.array([p["c"] - 30, p["d"]])
     >>> jump = DiscreteMode("jump", fire)

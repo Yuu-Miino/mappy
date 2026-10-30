@@ -271,7 +271,7 @@ mode is called ``"map"``:
 .. code-block:: python
 
    >>> from mappy_ds import Diffeomorphism, mapping
-   >>> @mapping(2, param_keys=["a", "b"])
+   >>> @mapping(2)
    ... def henon(y, p):
    ...     x, u = y
    ...     return np.array([1 - p["a"] * x**2 + u, p["b"] * x])

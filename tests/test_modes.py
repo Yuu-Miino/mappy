@@ -149,11 +149,11 @@ def test_continuous_hessian_finite_difference(izh_mode_tight, izh_params):
 def test_parametrised_border_derivatives_finite_difference():
     """Border depending on the state through a non-trivial gradient."""
 
-    @vector_field(2, ["w"])
+    @vector_field(2)
     def rot(y, p):
         return np.array([-p["w"] * y[1] + 0.5 * y[0], p["w"] * y[0]])
 
-    @border(2, ["r"])
+    @border(2)
     def circle(y, p):
         return y[0] ** 2 + y[1] ** 2 - p["r"] ** 2
 

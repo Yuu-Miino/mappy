@@ -64,7 +64,7 @@ PARAMS = {
 NON_INTERACTIVE_BACKENDS = ("agg", "pdf", "pgf", "ps", "svg", "cairo", "template")
 
 
-@vector_field(3, ["k", "V0", "V", "omega", "g1", "B1"])
+@vector_field(3)
 def alp_1(y, param):
     v1, v2, t = y
     k = param["k"]
@@ -83,7 +83,7 @@ def alp_1(y, param):
     )
 
 
-@vector_field(3, ["k", "V0", "V", "omega", "g2", "B2"])
+@vector_field(3)
 def alp_2(y, param):
     v1, v2, t = y
     k = param["k"]
@@ -112,12 +112,12 @@ def border_2(y, _):
     return y[1] + 0.1
 
 
-@border(3, ["omega"])
+@border(3)
 def poin_sec(y, param):
     return y[2] - 2 * np.pi / param["omega"]
 
 
-@mapping(3, 3, ["omega"])
+@mapping(3, 3)
 def poin_sec_reset(y, param):
     return y - np.array([0, 0, 2 * np.pi / param["omega"]])
 

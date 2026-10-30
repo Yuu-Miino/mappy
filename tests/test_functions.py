@@ -20,9 +20,9 @@ from mappy_ds import (
 
 
 def test_vector_field_attributes():
-    @vector_field(3, ["k", "B"])
+    @vector_field(3)
     def f(y, p):
-        return y
+        return p["k"] * y + p["B"]
 
     assert isinstance(f, SystemFunction)
     assert (f.dom_dim, f.cod_dim) == (3, 3)
@@ -36,7 +36,7 @@ def test_mapping_attributes():
     def square(y, _):
         return y
 
-    @mapping(2, 1, param_keys=["c"])
+    @mapping(2, 1)
     def proj(y, p):
         return y[0] * p["c"]
 
@@ -46,7 +46,7 @@ def test_mapping_attributes():
 
 @pytest.mark.parametrize("direction", [1, -1, 0])
 def test_border_attributes(direction):
-    @border(2, ["T"], direction=direction)
+    @border(2, direction=direction)
     def b(y, p):
         return y[1] - p["T"]
 
@@ -63,20 +63,33 @@ def test_border_default_direction_is_positive():
     assert b.direction == 1
 
 
+def test_param_keys_discovered_in_access_order():
+    @mapping(1)
+    def f(y, p):
+        return p["beta"] * y + p["alpha"] + p["beta"]
+
+    assert f.param_keys == ("beta", "alpha")
+    assert f([1.0], {"alpha": 2.0, "beta": 3.0, "unused": 0.0}) == [8.0]
+
+
 @pytest.mark.parametrize(
-    "decorator",
+    "body",
     [
-        lambda: vector_field(2, "abc"),
-        lambda: mapping(2, param_keys="abc"),
-        lambda: border(2, "abc"),
+        lambda p: p.get("a", 1.0),
+        lambda p: "a" in p,
+        lambda p: len(p),
+        lambda p: list(p),
+        lambda p: p[0],
     ],
 )
-def test_string_param_keys_rejected(decorator):
+def test_unsupported_parameter_access_rejected(body):
+    @mapping(1)
     def f(y, p):
-        return y[0]
+        body(p)
+        return y
 
-    with pytest.raises(TypeError, match="string"):
-        decorator()(f)
+    with pytest.raises(SymbolicEvaluationError):
+        f.param_keys  # noqa: B018
 
 
 def test_nonpositive_dimension_rejected():
@@ -105,7 +118,7 @@ def test_integer_input_gives_float_output():
 
 
 def test_scalar_input_accepted():
-    @mapping(1, 2, param_keys=["s"])
+    @mapping(1, 2)
     def lift(u, p):
         return u * np.array([0, 1]) + np.array([p["s"], 0])
 
@@ -176,7 +189,7 @@ def test_constant_function():
 
 
 def test_sympy_functions_are_supported():
-    @vector_field(2, ["w"])
+    @vector_field(2)
     def osc(y, p):
         return np.array([y[1], -sympy.sin(p["w"] * y[0])])
 
