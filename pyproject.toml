@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mappy-ds"
-version = "0.1.0"
+version = "0.2.0"
 description = "Poincaré maps, periodic points and bifurcations of hybrid dynamical systems"
 readme = "README.md"
 license = "MIT"
