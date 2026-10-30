@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-30
+
+Parameter derivatives of the Poincaré map and pseudo-arclength continuation.
+
 ### Added
 
 - Derivatives with respect to the parameters: `image_detail(...,
@@ -26,7 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `find_local_bf` solves with an analytic Jacobian of the bifurcation system
   (Jacobian, Hessian and `jac_p` of the map; only the parameter derivative of
   `DTⁿ` uses a central difference).
-
 - `examples/henon.py --mode bifurcation|mle` (one-parameter bifurcation
   diagram and maximum Lyapunov exponent by Benettin's method) and
   `examples/duffing.py --mode bifurcation`, reproducing Fig. 8 and Fig. 10
@@ -109,5 +112,6 @@ unreleased `mappy` 0.0.x.
   TypeVars and the empty `mappy.limit` subpackage.
 - The import-time `numpy.set_printoptions` side effect.
 
-[Unreleased]: https://github.com/Yuu-Miino/mappy/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Yuu-Miino/mappy/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Yuu-Miino/mappy/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Yuu-Miino/mappy/releases/tag/v0.1.0
