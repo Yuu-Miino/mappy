@@ -39,42 +39,57 @@ and let the package build the map:
 
 ```python
 import numpy as np
-from mappy_ds import (ContinuousMode, DiscreteMode, PoincareMap,
-                      border, mapping, vector_field)
+from mappy_ds import (
+    ContinuousMode,
+    DiscreteMode,
+    PoincareMap,
+    border,
+    mapping,
+    vector_field,
+)
+
 
 @vector_field(dim=2)
 def izhikevich(y, p):
     v, u = y
-    return np.array([0.04 * v**2 + 5 * v + 140 - u + p["I"],
-                     p["a"] * (p["b"] * v - u)])
+    return np.array([0.04 * v**2 + 5 * v + 140 - u + p["I"], p["a"] * (p["b"] * v - u)])
+
 
 @border(dim=2)
 def fire(y, _):
     return y[0] - 30
 
+
 @mapping(2)
 def firing(y, p):
     return y + np.array([p["c"] - 30, p["d"]])
 
+
 @mapping(2, 1)
-def reduce(y, _):            # section (v = 30) -> u
+def reduce(y, _):  # section (v = 30) -> u
     return np.array([0, 1]) @ y
 
+
 @mapping(1, 2)
-def revert(u, _):            # u -> section (v = 30)
+def revert(u, _):  # u -> section (v = 30)
     return u * np.array([0, 1]) + np.array([30, 0])
 
+
 pmap = PoincareMap(
-    [ContinuousMode("A", izhikevich, borders=[fire]),
-     DiscreteMode("B", firing), DiscreteMode("P", reduce), DiscreteMode("Pinv", revert)],
+    [
+        ContinuousMode("A", izhikevich, borders=[fire]),
+        DiscreteMode("B", firing),
+        DiscreteMode("P", reduce),
+        DiscreteMode("Pinv", revert),
+    ],
     {"A": ["P"], "B": "A", "P": "Pinv", "Pinv": "B"},
     initial_mode="Pinv",
 )
 
 params = {"a": 0.2, "b": 0.2, "c": -50.0, "d": 2.0, "I": 10.0}
 res = pmap.image_detail(-3.0, params, hessian=True)
-print(res.y, res.jac, res.hes)      # [-3.47838] [[0.27080]] [[[-0.19326]]]
-print(res.mode_history)             # ['Pinv', 'B', 'A', 'P', 'Pinv']
+print(res.y, res.jac, res.hes)  # [-3.47838] [[0.27080]] [[[-0.19326]]]
+print(res.mode_history)  # ['Pinv', 'B', 'A', 'P', 'Pinv']
 ```
 
 Find a fixed point and follow it while a parameter changes:
@@ -83,9 +98,11 @@ Find a fixed point and follow it while a parameter changes:
 from mappy_ds.root import find_cycle, trace_cycle
 
 fp = find_cycle(pmap, -4.5, {**params, "I": 8.0})
-print(fp.y, fp.eigvals)             # [-4.64542] [0.22196+0.j]
+print(fp.y, fp.eigvals)  # [-4.64542] [0.22196+0.j]
 
-branch = trace_cycle(pmap, fp.y, {**params, "I": 8.0}, "I", end_value=4.5, resolution=50)
+branch = trace_cycle(
+    pmap, fp.y, {**params, "I": 8.0}, "I", end_value=4.5, resolution=50
+)
 ```
 
 Smooth systems are a special case: a discrete map is a single mode

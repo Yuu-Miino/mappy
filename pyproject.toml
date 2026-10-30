@@ -82,6 +82,8 @@ include = ["src/", "tests/", "examples/", "README.md", "LICENSE", "CHANGELOG.md"
 line-length = 88
 target-version = "py311"
 src = ["src", "tests"]
+# Scratch scripts accompanying the LaTeX note; kept verbatim, not maintained.
+extend-exclude = ["docs/notes"]
 
 [tool.ruff.lint]
 select = [
