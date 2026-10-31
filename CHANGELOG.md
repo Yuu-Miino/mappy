@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Python 3.14 is tested in CI and declared in the classifiers; the 3.15
+  pre-release runs as an experimental job.
+
 ## [0.2.0] - 2026-10-30
 
 Parameter derivatives of the Poincaré map and pseudo-arclength continuation.

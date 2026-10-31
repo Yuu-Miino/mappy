@@ -24,7 +24,7 @@ uvx pre-commit install      # optional: run ruff on every commit
 | Run all hooks     | `uvx pre-commit run --all-files`                         |
 
 CI (`.github/workflows/ci.yml`) runs ruff, `ruff format --check`, mypy and the
-test suite on Python 3.11–3.13; please make sure these pass locally before
+test suite on Python 3.11–3.14 (and, as an experimental job, the 3.15 pre-release); please make sure these pass locally before
 opening a pull request. Docs are built in CI with `-W` (warnings are errors).
 
 ## Branches
