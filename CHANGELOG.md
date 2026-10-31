@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   depend on parameters) and the chain rule across modes;
   `SystemFunction.mixed_hessian()`; `Mode.step(..., mixed_hessian=True)`.
 
+- `trace_local_bf_arclength`: pseudo-arclength continuation of a
+  bifurcation curve in the `(y, λ_bf, θ, λ_cnt)` space with the fully
+  analytic Jacobian of the bifurcation conditions; passes cusps and flags
+  `fold`, strong resonances `resonance_1_1` … `resonance_1_4` on
+  Neimark–Sacker curves and `second_multiplier_crossing`.
+
 ### Changed
 
 - `find_local_bf` is fully analytic: the parameter derivative of `DTⁿ` comes

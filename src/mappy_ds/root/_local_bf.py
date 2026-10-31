@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import sys
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,11 +11,22 @@ import numpy as np
 from scipy.optimize import root
 
 from .._typing import Params, State, StateLike, as_state
-from ..continuation import ContinuationStep, StepFunctionResult, continuation
-from ..maps import Map
+from ..continuation import (
+    ArclengthPoint,
+    ContinuationStep,
+    StepFunctionResult,
+    arclength_continuation,
+    continuation,
+)
+from ..maps import Map, MapResult
 from ._cycle import CycleResult
 
-__all__ = ["LocalBfResult", "find_local_bf", "trace_local_bf"]
+__all__ = [
+    "LocalBfResult",
+    "find_local_bf",
+    "trace_local_bf",
+    "trace_local_bf_arclength",
+]
 
 
 @dataclass
@@ -60,28 +72,25 @@ def _cofactor(a: np.ndarray) -> np.ndarray:
     return c
 
 
-def _local_bf_system(
+def _bifurcation_system(
     diffeo: Map,
-    var: State,
+    y: State,
     params: dict[str, Any],
-    param_key: str,
+    theta: float,
     period: int,
-) -> tuple[State, np.ndarray]:
-    r"""Residual and Jacobian of the local-bifurcation system.
+    diff_keys: Sequence[str],
+) -> tuple[State, np.ndarray, np.ndarray, np.ndarray, MapResult]:
+    r"""Residual of the local-bifurcation conditions and its derivatives.
 
-    Unknowns are ``var = (y, λ, θ)`` with ``λ = params[param_key]``. The
-    residual is ``(T(y) - y, Re det A, Im det A)`` with
-    ``A = DT(y) - e^{iθ} I``. Its Jacobian is analytic: it uses the map's
-    Jacobian, Hessian, parameter derivative and mixed derivative
-    ``∂(DT)/∂λ``.
+    The residual is ``(Tⁿ(y) - y, Re det A, Im det A)`` with
+    ``A = DTⁿ(y) - e^{iθ} I``. Returned are the residual, its derivative with
+    respect to ``y`` (``(dim+2) × dim``), with respect to each parameter in
+    ``diff_keys`` (``(dim+2) × len(diff_keys)``) and with respect to ``θ``
+    (``(dim+2,)``), all analytic from the map's Jacobian, Hessian, parameter
+    derivative and mixed derivative, plus the :class:`~mappy_ds.MapResult`.
     """
-    dim = var.size - 2
-    y = var[:dim]
-    lam = float(var[dim])
-    theta = float(var[dim + 1])
-    p = dict(params)
-    p[param_key] = lam
-    res = diffeo.image_detail(y, p, period, parameter_hessian=True)
+    dim = y.size
+    res = diffeo.image_detail(y, params, period, parameter_hessian=True)
     assert res.jac is not None and res.hes is not None
     assert res.jac_p is not None and res.hes_p is not None
     jac, hes = res.jac, res.hes
@@ -95,26 +104,43 @@ def _local_bf_system(
     out[dim] = det.real
     out[dim + 1] = det.imag
 
-    if param_key in res.param_keys:
-        djac_dlam = res.hes_p[:, :, res.param_keys.index(param_key)]
-    else:  # the map does not depend on the parameter
-        djac_dlam = np.zeros_like(jac)
-
     ddet_dy = np.einsum("ij,ijk->k", cof, hes)  # ∂A_ij/∂y_k = hes[i, j, k]
-    ddet_dlam = np.sum(cof * djac_dlam)
-    ddet_dtheta = -1j * mu * np.trace(cof)  # ∂A/∂θ = -i e^{iθ} I
+    d_dy = np.zeros((dim + 2, dim))
+    d_dy[:dim] = jac - np.eye(dim)
+    d_dy[dim] = ddet_dy.real
+    d_dy[dim + 1] = ddet_dy.imag
 
-    jacobian = np.zeros((dim + 2, dim + 2))
-    jacobian[:dim, :dim] = jac - np.eye(dim)
-    if param_key in res.param_keys:
-        jacobian[:dim, dim] = res.jac_p[:, res.param_keys.index(param_key)]
-    jacobian[dim, :dim] = ddet_dy.real
-    jacobian[dim + 1, :dim] = ddet_dy.imag
-    jacobian[dim, dim] = ddet_dlam.real
-    jacobian[dim + 1, dim] = ddet_dlam.imag
-    jacobian[dim, dim + 1] = ddet_dtheta.real
-    jacobian[dim + 1, dim + 1] = ddet_dtheta.imag
-    return out, jacobian
+    d_dp = np.zeros((dim + 2, len(diff_keys)))
+    for m, key in enumerate(diff_keys):
+        if key not in res.param_keys:  # the map does not depend on it
+            continue
+        col = res.param_keys.index(key)
+        ddet = np.sum(cof * res.hes_p[:, :, col])
+        d_dp[:dim, m] = res.jac_p[:, col]
+        d_dp[dim, m] = ddet.real
+        d_dp[dim + 1, m] = ddet.imag
+
+    ddet_dtheta = -1j * mu * np.trace(cof)  # ∂A/∂θ = -i e^{iθ} I
+    d_dtheta = np.zeros(dim + 2)
+    d_dtheta[dim] = ddet_dtheta.real
+    d_dtheta[dim + 1] = ddet_dtheta.imag
+    return out, d_dy, d_dp, d_dtheta, res
+
+
+def _local_bf_system(
+    diffeo: Map,
+    var: State,
+    params: dict[str, Any],
+    param_key: str,
+    period: int,
+) -> tuple[State, np.ndarray]:
+    """Residual and square Jacobian for unknowns ``var = (y, λ, θ)``."""
+    dim = var.size - 2
+    p = {**params, param_key: float(var[dim])}
+    out, d_dy, d_dp, d_dtheta, _ = _bifurcation_system(
+        diffeo, var[:dim], p, float(var[dim + 1]), period, (param_key,)
+    )
+    return out, np.column_stack([d_dy, d_dp, d_dtheta])
 
 
 def find_local_bf(
@@ -338,3 +364,235 @@ def trace_local_bf(
         callback=inner_callback,
     )
     return [to_public(s) for s in steps]
+
+
+#: Resonances of a Neimark–Sacker curve flagged while ``θ`` varies: the test
+#: function changes sign where the critical pair ``e^{±iθ}`` passes a root of
+#: unity (1:1 at θ=0, 1:2 at θ=π, 1:3 at 2π/3, 1:4 at π/2).
+def _resonance_events(theta_prev: float, theta: float) -> list[str]:
+    events: list[str] = []
+    if theta_prev == theta:
+        return events
+    s0, s1 = np.sin(theta_prev), np.sin(theta)
+    c0, c1 = np.cos(theta_prev), np.cos(theta)
+    if s0 * s1 < 0:
+        events.append("resonance_1_1" if c1 > 0 else "resonance_1_2")
+    if (c0 + 0.5) * (c1 + 0.5) < 0:
+        events.append("resonance_1_3")
+    if c0 * c1 < 0:
+        events.append("resonance_1_4")
+    return events
+
+
+def trace_local_bf_arclength(
+    diffeo: Map,
+    y0: StateLike,
+    params: Params,
+    bf_param_key: str,
+    theta: float,
+    cnt_param_key: str,
+    *,
+    period: int = 1,
+    direction: int = 1,
+    bounds: tuple[float, float] | None = None,
+    step: float = 0.01,
+    step_min: float = 1e-6,
+    step_max: float = 0.1,
+    max_steps: int = 1000,
+    show_progress: bool = False,
+    callback: Callable[[ContinuationStep[State]], None] | None = None,
+) -> list[ContinuationStep[State]]:
+    r"""Follow a local-bifurcation curve by pseudo-arclength continuation.
+
+    The bifurcation conditions of :func:`find_local_bf`,
+
+    .. math::
+
+       T^n(\bm y) - \bm y = 0, \qquad
+       \det\parens{DT^n(\bm y) - e^{i\theta} I} = 0 \;(\text{real and imaginary parts}),
+
+    are :math:`d + 2` equations in the :math:`d + 3` unknowns
+    :math:`u = (\bm y, \lambda_{\mathrm{bf}}, \theta, \lambda_{\mathrm{cnt}})`,
+    so their solutions form a curve: the bifurcation curve in the
+    :math:`(\lambda_{\mathrm{cnt}}, \lambda_{\mathrm{bf}})` plane together
+    with the periodic point and the argument of the critical multiplier. The
+    curve is followed with :func:`~mappy_ds.continuation.arclength_continuation`,
+    so it may turn back in :math:`\lambda_{\mathrm{cnt}}` (as a fold curve
+    does at a cusp) without stopping. The Jacobian of the system is fully
+    analytic (:attr:`~mappy_ds.MapResult.jac`, :attr:`~mappy_ds.MapResult.hes`,
+    :attr:`~mappy_ds.MapResult.jac_p`, :attr:`~mappy_ds.MapResult.hes_p`).
+
+    Events between consecutive points are recorded in ``info["events"]`` of
+    the later point:
+
+    * ``"fold"`` — the curve turns back in :math:`\lambda_{\mathrm{cnt}}`
+      (for a fold curve this happens at a cusp);
+    * ``"resonance_1_1"``, ``"resonance_1_2"``, ``"resonance_1_3"``,
+      ``"resonance_1_4"`` — on a Neimark–Sacker curve, :math:`\theta` passes
+      :math:`0`, :math:`\pi`, :math:`2\pi/3` or :math:`\pi/2` (strong
+      resonances);
+    * ``"second_multiplier_crossing"`` — the number of multipliers outside
+      the unit circle changes, i.e. another bifurcation curve is crossed
+      (fold–flip, flip–Neimark–Sacker, ... points).
+
+    Parameters
+    ----------
+    diffeo : Map
+        The map.
+    y0 : array_like
+        Periodic point at the starting bifurcation point (e.g. from
+        :func:`find_local_bf`); it is corrected first with both parameters
+        held fixed.
+    params : mapping
+        Parameters at the start; ``params[bf_param_key]`` is the bifurcation
+        value, ``params[cnt_param_key]`` the start of the continuation. Not
+        modified.
+    bf_param_key, cnt_param_key : str
+        Keys of the bifurcation parameter (solved along the curve) and of the
+        continuation parameter (the ``direction``/``bounds`` coordinate).
+    theta : float
+        Argument of the critical multiplier at the start (``0`` fold, ``pi``
+        period doubling, otherwise Neimark–Sacker).
+    period : int, optional
+        Period of the cycle, by default ``1``.
+    direction : int, optional
+        ``+1`` to start with :math:`\lambda_{\mathrm{cnt}}` increasing, ``-1``
+        decreasing; by default ``1``.
+    bounds : tuple of float, optional
+        Stop when :math:`\lambda_{\mathrm{cnt}}` leaves ``[lo, hi]``.
+    step, step_min, step_max : float, optional
+        Arclength step in the :math:`u` space; see
+        :func:`~mappy_ds.continuation.arclength_continuation`.
+    max_steps : int, optional
+        Maximum number of points after the first, by default ``1000``.
+    show_progress : bool, optional
+        Print one line per accepted point to standard error.
+    callback : callable, optional
+        Called with each accepted :class:`~mappy_ds.ContinuationStep`.
+
+    Returns
+    -------
+    list of ContinuationStep
+        One step per accepted point along the curve. ``y`` is the periodic
+        point, ``params`` holds both parameters at their values on the curve,
+        and ``info`` holds ``theta``, ``eigvals``, ``eigvecs``, ``tangent``
+        (unit vector in the :math:`u` space), ``step``, ``newton_iterations``
+        and ``events``.
+
+    Raises
+    ------
+    ValueError
+        If the two keys coincide or the map depends on neither.
+
+    See Also
+    --------
+    trace_local_bf : Natural-parameter continuation of the same curve.
+    trace_cycle_arclength : The same method for branches of periodic points.
+
+    Examples
+    --------
+    The cusp normal form ``x ↦ x + λ₁ + λ₂ x - x³`` has the fold curve
+    ``λ₂ = 3x², λ₁ = -2x³``, which turns back in ``λ₂`` at the cusp
+    ``(0, 0)``. Starting on the upper branch and decreasing ``λ₂``, the
+    continuation passes the cusp onto the lower branch:
+
+    >>> import numpy as np
+    >>> from mappy_ds import Diffeomorphism, mapping
+    >>> from mappy_ds.root import trace_local_bf_arclength
+    >>> @mapping(1)
+    ... def cusp(x, p):
+    ...     return x + p["l1"] + p["l2"] * x - x**3
+    >>> steps = trace_local_bf_arclength(
+    ...     Diffeomorphism(cusp), [0.5], {"l1": -0.25, "l2": 0.75}, "l1", 0.0,
+    ...     "l2", direction=-1, step=0.1, step_max=0.2, bounds=(-1.0, 0.75),
+    ... )
+    >>> any("fold" in s.info["events"] for s in steps)
+    True
+    >>> steps[-1].y[0] < 0 and steps[-1].params["l1"] > 0
+    True
+    """
+    if bf_param_key == cnt_param_key:
+        raise ValueError("bf_param_key and cnt_param_key must differ")
+    keys = (bf_param_key, cnt_param_key)
+    if not any(k in diffeo.param_keys for k in keys):
+        raise ValueError(f"the map depends on neither of {keys}")
+    _y0 = as_state(y0)
+    dim = _y0.size
+    base = dict(params)
+    cache: dict[int, MapResult] = {}
+
+    def system(u: np.ndarray) -> tuple[State, np.ndarray]:
+        p = {**base, bf_param_key: float(u[dim]), cnt_param_key: float(u[dim + 2])}
+        out, d_dy, d_dp, d_dtheta, res = _bifurcation_system(
+            diffeo, u[:dim], p, float(u[dim + 1]), period, keys
+        )
+        cache[0] = res
+        # columns: y, λ_bf, θ, λ_cnt
+        return out, np.column_stack([d_dy, d_dp[:, 0], d_dtheta, d_dp[:, 1]])
+
+    steps: list[ContinuationStep[State]] = []
+    state: dict[str, Any] = {}
+
+    def on_point(point: ArclengthPoint) -> None:
+        res = cache[0]
+        eig, eigvec = res.eigvals, res.eigvecs
+        th = float(point.u[dim + 1])
+        outside = int(np.sum(np.abs(eig) > 1.0 + 1e-6))
+        events: list[str] = []
+        if steps:
+            if state["tangent"][-1] * point.tangent[-1] < 0:
+                events.append("fold")
+            events.extend(_resonance_events(state["theta"], th))
+            if outside != state["outside"]:
+                events.append("second_multiplier_crossing")
+        state.update(tangent=point.tangent, theta=th, outside=outside)
+        cs = ContinuationStep(
+            point.u[:dim].copy(),
+            {
+                **base,
+                bf_param_key: float(point.u[dim]),
+                cnt_param_key: float(point.u[dim + 2]),
+            },
+            {
+                "theta": th,
+                "eigvals": eig,
+                "eigvecs": eigvec,
+                "tangent": point.tangent,
+                "step": point.step,
+                "newton_iterations": point.newton_iterations,
+                "events": tuple(events),
+            },
+        )
+        steps.append(cs)
+        if callback is not None:
+            callback(cs)
+        if show_progress:
+            tag = f" {','.join(events)}" if events else ""
+            lam_c, lam_b = cs.params[cnt_param_key], cs.params[bf_param_key]
+            print(
+                f"ARCLENGTH {len(steps):5d} {cnt_param_key}={lam_c:+.10g} "
+                f"{bf_param_key}={lam_b:+.10g} θ={th:+.6f} h={point.step:.3g}{tag}",
+                end="\r",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    u0 = np.concatenate(
+        [_y0, [float(base[bf_param_key]), float(theta), float(base[cnt_param_key])]]
+    )
+    try:
+        arclength_continuation(
+            system,
+            u0,
+            step=step,
+            step_min=step_min,
+            step_max=step_max,
+            max_steps=max_steps,
+            direction=direction,
+            bounds=bounds,
+            callback=on_point,
+        )
+    finally:
+        if show_progress:
+            print(file=sys.stderr)
+    return steps
