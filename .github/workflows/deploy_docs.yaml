@@ -29,12 +29,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref_name }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           python-version: '3.13'
@@ -46,7 +46,7 @@ jobs:
         run: uv run sphinx-build -W --keep-going -b html docs/source docs/build/html
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: html
           path: docs/build/html
@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout documentation repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: Yuu-Miino/doc.mappy
           ref: gh-pages
@@ -73,7 +73,7 @@ jobs:
           fi
 
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: html
           path: ${{ env.DOC_REF }}
