@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-31
+
+Mixed derivatives and pseudo-arclength continuation of bifurcation curves.
+
 ### Added
 
 - Python 3.14 is tested in CI and declared in the classifiers; the 3.15
@@ -18,7 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   system in continuous modes, its border correction (including borders that
   depend on parameters) and the chain rule across modes;
   `SystemFunction.mixed_hessian()`; `Mode.step(..., mixed_hessian=True)`.
-
 - `trace_local_bf_arclength`: pseudo-arclength continuation of a
   bifurcation curve in the `(y, λ_bf, θ, λ_cnt)` space with the fully
   analytic Jacobian of the bifurcation conditions; passes cusps and flags
@@ -135,6 +138,7 @@ unreleased `mappy` 0.0.x.
   TypeVars and the empty `mappy.limit` subpackage.
 - The import-time `numpy.set_printoptions` side effect.
 
-[Unreleased]: https://github.com/Yuu-Miino/mappy/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Yuu-Miino/mappy/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Yuu-Miino/mappy/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Yuu-Miino/mappy/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Yuu-Miino/mappy/releases/tag/v0.1.0
