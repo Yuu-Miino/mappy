@@ -71,11 +71,9 @@ def _local_bf_system(
 
     Unknowns are ``var = (y, λ, θ)`` with ``λ = params[param_key]``. The
     residual is ``(T(y) - y, Re det A, Im det A)`` with
-    ``A = DT(y) - e^{iθ} I``. Its Jacobian uses the map's Jacobian, Hessian
-    and parameter derivative; only ``∂(DT)/∂λ``, which enters the determinant
-    rows, is approximated by a central difference (two extra map
-    evaluations), because second derivatives with respect to parameters are
-    not available.
+    ``A = DT(y) - e^{iθ} I``. Its Jacobian is analytic: it uses the map's
+    Jacobian, Hessian, parameter derivative and mixed derivative
+    ``∂(DT)/∂λ``.
     """
     dim = var.size - 2
     y = var[:dim]
@@ -83,10 +81,9 @@ def _local_bf_system(
     theta = float(var[dim + 1])
     p = dict(params)
     p[param_key] = lam
-    res = diffeo.image_detail(
-        y, p, period, jacobian=True, hessian=True, parameter_jacobian=True
-    )
-    assert res.jac is not None and res.hes is not None and res.jac_p is not None
+    res = diffeo.image_detail(y, p, period, parameter_hessian=True)
+    assert res.jac is not None and res.hes is not None
+    assert res.jac_p is not None and res.hes_p is not None
     jac, hes = res.jac, res.hes
     mu = np.exp(1j * theta)
     a = jac - mu * np.eye(dim)
@@ -98,12 +95,10 @@ def _local_bf_system(
     out[dim] = det.real
     out[dim + 1] = det.imag
 
-    # ∂(DT)/∂λ by a central difference
-    h = 1e-6 * max(1.0, abs(lam))
-    jac_plus = diffeo.image_detail(y, {**p, param_key: lam + h}, period).jac
-    jac_minus = diffeo.image_detail(y, {**p, param_key: lam - h}, period).jac
-    assert jac_plus is not None and jac_minus is not None
-    djac_dlam = (jac_plus - jac_minus) / (2 * h)
+    if param_key in res.param_keys:
+        djac_dlam = res.hes_p[:, :, res.param_keys.index(param_key)]
+    else:  # the map does not depend on the parameter
+        djac_dlam = np.zeros_like(jac)
 
     ddet_dy = np.einsum("ij,ijk->k", cof, hes)  # ∂A_ij/∂y_k = hes[i, j, k]
     ddet_dlam = np.sum(cof * djac_dlam)
@@ -153,9 +148,9 @@ def find_local_bf(
       multipliers :math:`e^{\pm i\theta}` on the unit circle.
 
     The Jacobian of this system is supplied analytically from the map's
-    Jacobian, Hessian and parameter derivative (:attr:`MapResult.jac_p
-    <mappy_ds.MapResult.jac_p>`); only the derivative of the determinant
-    with respect to the parameter uses a central difference of ``DTⁿ``.
+    Jacobian, Hessian, parameter derivative (:attr:`MapResult.jac_p
+    <mappy_ds.MapResult.jac_p>`) and mixed derivative
+    (:attr:`MapResult.hes_p <mappy_ds.MapResult.hes_p>`).
 
     Parameters
     ----------
@@ -207,9 +202,7 @@ def find_local_bf(
         # Same request as inside the objective, so that the multipliers are
         # consistent with the system that was solved (the variational
         # equations change the step sequence of the ODE solver).
-        detail = diffeo.image_detail(
-            y1, p1, period, jacobian=True, hessian=True, parameter_jacobian=True
-        )
+        detail = diffeo.image_detail(y1, p1, period, parameter_hessian=True)
         eigvals, eigvecs = detail.eigvals, detail.eigvecs
     return LocalBfResult(
         success=success,

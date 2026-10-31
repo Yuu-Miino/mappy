@@ -666,3 +666,36 @@ def test_parameter_jacobian_not_requested(henon_map, henon_params):
         [0.1, 0.2], henon_params, jacobian=False, parameter_jacobian=True
     )
     assert res.jac is not None and res.jac_p is not None  # implies jacobian
+
+
+# -- mixed derivatives ------------------------------------------------------
+
+
+def _fd_hes_p(diffeo, y0, params, keys, n=1, h=1e-6):
+    cols = []
+    for k in keys:
+        up = diffeo.image_detail(y0, {**params, k: params[k] + h}, n).jac
+        dn = diffeo.image_detail(y0, {**params, k: params[k] - h}, n).jac
+        cols.append((up - dn) / (2 * h))
+    return np.stack(cols, axis=-1)
+
+
+def test_henon_mixed_hessian_composes(henon_map, henon_params):
+    y0 = np.array([0.1, 0.2])
+    res = henon_map.image_detail(y0, henon_params, n=3, parameter_hessian=True)
+    assert res.hes is not None and res.jac_p is not None  # implied
+    assert res.hes_p is not None and res.hes_p.shape == (2, 2, 2)
+    fd = _fd_hes_p(henon_map, y0, henon_params, res.param_keys, n=3)
+    assert_allclose(res.hes_p, fd, rtol=1e-6, atol=1e-7)
+
+
+def test_izhikevich_mixed_hessian_matches_fd(izh_map_tight, izh_params):
+    res = izh_map_tight.image_detail(-3.0, izh_params, parameter_hessian=True)
+    assert res.hes_p is not None and res.hes_p.shape == (1, 1, 5)
+    fd = _fd_hes_p(izh_map_tight, -3.0, izh_params, res.param_keys, h=1e-5)
+    assert_allclose(res.hes_p, fd, rtol=1e-5, atol=1e-7)
+
+
+def test_mixed_hessian_not_requested(henon_map, henon_params):
+    res = henon_map.image_detail([0.1, 0.2], henon_params, parameter_jacobian=True)
+    assert res.hes_p is None

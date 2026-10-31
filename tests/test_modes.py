@@ -353,3 +353,79 @@ def test_parameter_jacobian_with_parametrised_border():
     # the hitting time depends on c only through the border: without the
     # correction term the derivative with respect to c would vanish
     assert res.jac_p[0, 1] == pytest.approx(1.0, rel=1e-8)
+
+
+# -- mixed derivatives ------------------------------------------------------
+
+
+def test_discrete_mode_mixed_hessian():
+    from conftest import henon
+
+    mode = DiscreteMode("h", henon)
+    params = {"a": 1.4, "b": 0.3}
+    res = mode.step([0.3, -0.2], params, param_keys=("a", "b"), mixed_hessian=True)
+    assert res.hes_p is not None and res.hes_p.shape == (2, 2, 2)
+    assert res.hes_p[0, 0, 0] == pytest.approx(-0.6)
+    with pytest.raises(ValueError, match="param_keys"):
+        mode.step([0.3, -0.2], params, mixed_hessian=True)
+
+
+def test_mixed_hessian_parametrised_border_exact():
+    """ẏ = (1, v) stopped at y0 = c·y1: T is known in closed form.
+
+    τ = (c y1 - y0)/(1 - c v), T = (y0 + τ, y1 + v τ). The border depends on
+    the state *and* on c, so every term of the correction is exercised.
+    """
+    import sympy as sp
+
+    @vector_field(2)
+    def field(y, p):
+        return np.array([1, p["v"]])
+
+    @border(2)
+    def stop(y, p):
+        return y[0] - p["c"] * y[1]
+
+    mode = ContinuousMode("m", field, borders=[stop], rtol=1e-12, atol=1e-14)
+    params = {"v": 0.3, "c": 2.0}
+    y0 = np.array([0.1, 0.5])
+    res = mode.step(y0, params, hessian=True, param_keys=("v", "c"), mixed_hessian=True)
+
+    x0, x1, v, c = sp.symbols("x0 x1 v c")
+    tau = (c * x1 - x0) / (1 - c * v)
+    T = [x0 + tau, x1 + v * tau]
+    X, P = [x0, x1], [v, c]
+    at = {x0: y0[0], x1: y0[1], v: params["v"], c: params["c"]}
+    exact = np.array(
+        [
+            [
+                [float(sp.diff(T[a], X[b], P[m]).subs(at)) for m in range(2)]
+                for b in range(2)
+            ]
+            for a in range(2)
+        ]
+    )
+    assert res.hes_p is not None
+    assert_allclose(res.hes_p, exact, rtol=1e-9, atol=1e-10)
+    assert_allclose(
+        res.jac_p,
+        [[float(sp.diff(T[a], P[m]).subs(at)) for m in range(2)] for a in range(2)],
+        rtol=1e-9,
+    )
+    assert res.hes_p[0, 1, 1] != 0.0  # the q_xp term contributes
+
+
+def test_mixed_hessian_matches_fd(izh_mode_tight, izh_params):
+    y0 = np.array([-50.0, -1.7])
+    keys = ("a", "I")
+    res = izh_mode_tight.step(y0, izh_params, param_keys=keys, mixed_hessian=True)
+    assert res.hes_p is not None and res.hes_p.shape == (2, 2, 2)
+    h = 1e-5
+    for m, k in enumerate(keys):
+        up = izh_mode_tight.step(
+            y0, {**izh_params, k: izh_params[k] + h}, jacobian=True
+        ).jac
+        dn = izh_mode_tight.step(
+            y0, {**izh_params, k: izh_params[k] - h}, jacobian=True
+        ).jac
+        assert_allclose(res.hes_p[:, :, m], (up - dn) / (2 * h), rtol=1e-5, atol=1e-7)
