@@ -220,9 +220,51 @@ follow the chain rule :math:`\partial_p (g \circ f) = Dg\, \partial_p f +
    >>> res.jac_p.shape
    (1, 5)
 
-:func:`~mappy_ds.root.find_local_bf` uses ``jac_p`` (together with the
-Jacobian and Hessian) to supply the root finder with an analytic Jacobian of
-the bifurcation conditions.
+Mixed derivatives
+=================
+
+``parameter_hessian=True`` additionally returns :attr:`MapResult.hes_p
+<mappy_ds.MapResult.hes_p>`, the mixed second derivative
+``hes_p[i, j, m] = ∂²y_i/(∂y0_j ∂p_m)`` — the derivative of the Jacobian with
+respect to the parameters. It is what the Jacobian of a bifurcation condition
+needs (the conditions involve :math:`DT^n`, so their parameter derivative
+involves :math:`\partial_p DT^n`), and what makes
+:func:`~mappy_ds.root.find_local_bf` fully analytic.
+
+For a continuous mode the sensitivity of the flow Jacobian,
+:math:`M = \partial^2\varphi/\partial\bm x_0\,\partial p`, obeys
+
+.. math::
+
+   \deriv{M_{ijm}}{t} = \sum_{l,r} (D^2 f)_{ilr} J_{lj} P_{rm}
+                      + \sum_l (\partial_p Df)_{ilm} J_{lj}
+                      + \sum_l (Df)_{il} M_{ljm}, \qquad M(0) = 0,
+
+integrated with the state, and at a border the parameter derivative
+:math:`\partial_p T = B P + G`, :math:`G = -\bm f \otimes \partial_p q / s`,
+is differentiated once more with respect to :math:`\bm x_0`. Every quantity
+evaluated at the hitting point :math:`\bm x_1` depends on :math:`\bm x_0`
+through the mode Jacobian :math:`J_T = B J`, and :math:`P(\tau)` also through
+:math:`\tau`:
+
+.. math::
+
+   \pderiv{(\partial_p T)}{\bm x_0}
+   = \parens{\pderiv{B}{\bm x} J_T} P
+   + B \brackets{ M + \parens{Df\, P + \partial_p \bm f} \otimes \pderiv{\tau}{\bm x_0} }
+   + \parens{\pderiv{G}{\bm x} J_T},
+   \qquad
+   \pderiv{G}{\bm x} = -\frac{Df \otimes \partial_p q + \bm f \otimes \partial^2_{\bm x p} q}{s}
+                       + \frac{(\bm f \otimes \partial_p q) \otimes \partial_{\bm x} s}{s^2},
+
+with :math:`\partial B/\partial\bm x` as in the border correction above. The
+last term vanishes for borders that do not depend on the parameters.
+Compositions follow :math:`\partial_p D(g \circ f) = D^2 g\,[Df, \partial_p f]
++ (\partial_p Dg)\, Df + Dg\, \partial_p Df`.
+
+:func:`~mappy_ds.root.find_local_bf` uses ``jac``, ``hes``, ``jac_p`` and
+``hes_p`` to supply the root finder with a fully analytic Jacobian of the
+bifurcation conditions.
 
 Composition
 ===========

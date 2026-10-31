@@ -307,3 +307,33 @@ def test_parameter_jacobian_for_scatters_columns(henon_fun, henon_params):
     assert_allclose(out[:, 2], [-(y[0] ** 2), 0.0])
     # a key the function reads but that is not requested is held fixed
     assert henon_fun.eval_parameter_jacobian_for(y, p, ("b",)).shape == (2, 1)
+
+
+# -- mixed Hessian ----------------------------------------------------------
+
+
+def test_mixed_hessian_henon(henon_fun, henon_params):
+    y = np.array([0.3, -0.2])
+    hp = henon_fun.mixed_hessian(y, henon_params)
+    assert hp.shape == (2, 2, 2)  # (cod, dom, k) with k = (a, b)
+    expected = np.zeros((2, 2, 2))
+    expected[0, 0, 0] = -2 * y[0]  # ∂²f_0/∂x∂a
+    expected[1, 0, 1] = 1.0  # ∂²f_1/∂x∂b
+    assert_allclose(hp, expected)
+
+
+def test_mixed_hessian_for_scatters(henon_fun, henon_params):
+    y = np.array([0.3, -0.2])
+    p = henon_fun.params_array(henon_params)
+    out = henon_fun.eval_mixed_hessian_for(y, p, ("zzz", "b"))
+    assert out.shape == (2, 2, 2)
+    assert_allclose(out[:, :, 0], 0.0)
+    assert_allclose(out[1, 0, 1], 1.0)
+
+
+def test_mixed_hessian_without_parameters():
+    @mapping(2)
+    def f(y, _):
+        return np.array([y[1], -y[0]])
+
+    assert f.mixed_hessian([1.0, 2.0]).shape == (2, 2, 0)

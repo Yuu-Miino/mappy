@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pre-release runs as an experimental job.
 - Dependabot configuration for `uv.lock` and the GitHub Actions (weekly,
   grouped updates).
+- Mixed second derivatives: `image_detail(..., parameter_hessian=True)`
+  returns `MapResult.hes_p` (`∂²y_i/∂y0_j∂p_m`) from a third variational
+  system in continuous modes, its border correction (including borders that
+  depend on parameters) and the chain rule across modes;
+  `SystemFunction.mixed_hessian()`; `Mode.step(..., mixed_hessian=True)`.
+
+### Changed
+
+- `find_local_bf` is fully analytic: the parameter derivative of `DTⁿ` comes
+  from `hes_p` instead of a central difference.
 
 ## [0.2.0] - 2026-10-30
 

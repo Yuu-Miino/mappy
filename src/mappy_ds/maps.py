@@ -39,6 +39,9 @@ class MapResult:
     jac_p : numpy.ndarray or None
         Derivative with respect to the parameters, ``jac_p[i, m] = ∂y_i/∂p_m``
         with ``m`` indexing ``param_keys``, if requested.
+    hes_p : numpy.ndarray or None
+        Mixed second derivative ``hes_p[i, j, m] = ∂²y_i/(∂y0_j ∂p_m)`` if
+        requested.
     param_keys : tuple of str
         Parameters the columns of ``jac_p`` refer to (the map's
         :attr:`Map.param_keys`).
@@ -53,6 +56,7 @@ class MapResult:
     jac: Jacobian | None = None
     hes: Hessian | None = None
     jac_p: Jacobian | None = None
+    hes_p: Hessian | None = None
     param_keys: tuple[str, ...] = ()
     mode_history: list[str] = field(default_factory=list)
     trajectory: Trajectory | None = None
@@ -115,6 +119,7 @@ class Map(ABC):
         hessian: bool = False,
         trajectory: bool = False,
         parameter_jacobian: bool = False,
+        parameter_hessian: bool = False,
     ) -> MapResult:
         """Compute the ``n``-th image of ``y0`` with derivatives.
 
@@ -136,6 +141,9 @@ class Map(ABC):
         parameter_jacobian : bool, optional
             Compute the derivative with respect to every parameter in
             :attr:`param_keys` (implies ``jacobian``), by default ``False``.
+        parameter_hessian : bool, optional
+            Compute the mixed second derivative ``hes_p`` (implies
+            ``hessian`` and ``parameter_jacobian``), by default ``False``.
 
         Returns
         -------
@@ -166,19 +174,22 @@ def _compose(
     jac: Jacobian | None,
     hes: Hessian | None,
     jac_p: Jacobian | None,
+    hes_p: Hessian | None,
     jac_step: Jacobian | None,
     hes_step: Hessian | None,
     jac_p_step: Jacobian | None,
-) -> tuple[Jacobian | None, Hessian | None, Jacobian | None]:
+    hes_p_step: Hessian | None,
+) -> tuple[Jacobian | None, Hessian | None, Jacobian | None, Hessian | None]:
     """Chain rule for ``g ∘ f`` given derivatives of ``f`` (so far) and ``g``.
 
-    ``D(g∘f) = Dg Df``, ``D²(g∘f) = D²g[Df, Df] + Dg D²f`` and
-    ``∂_p(g∘f) = Dg ∂_p f + ∂_p g``.
+    ``D(g∘f) = Dg Df``, ``D²(g∘f) = D²g[Df, Df] + Dg D²f``,
+    ``∂_p(g∘f) = Dg ∂_p f + ∂_p g`` and
+    ``∂_p D(g∘f) = D²g[Df, ∂_p f] + (∂_p Dg) Df + Dg ∂_p Df``.
     """
     if jac_step is None:
-        return None, None, None
+        return None, None, None, None
     if jac is None:
-        return jac_step, hes_step, jac_p_step
+        return jac_step, hes_step, jac_p_step, hes_p_step
     if hes is not None and hes_step is not None:
         hes_new = np.einsum("ilm,lj,mk->ijk", hes_step, jac, jac) + np.einsum(
             "il,ljk->ijk", jac_step, hes
@@ -189,7 +200,20 @@ def _compose(
         jac_p_new = jac_step @ jac_p + jac_p_step
     else:
         jac_p_new = None
-    return jac_step @ jac, hes_new, jac_p_new
+    if (
+        hes_p is not None
+        and hes_p_step is not None
+        and hes_step is not None
+        and jac_p is not None
+    ):
+        hes_p_new = (
+            np.einsum("alr,lb,rm->abm", hes_step, jac, jac_p)
+            + np.einsum("alm,lb->abm", hes_p_step, jac)
+            + np.einsum("al,lbm->abm", jac_step, hes_p)
+        )
+    else:
+        hes_p_new = None
+    return jac_step @ jac, hes_new, jac_p_new, hes_p_new
 
 
 class PoincareMap(Map):
@@ -388,12 +412,14 @@ class PoincareMap(Map):
         hessian: bool,
         trajectory: bool,
         param_keys: tuple[str, ...] | None = None,
+        mixed: bool = False,
     ) -> Iterator[
         tuple[
             State,
             Jacobian | None,
             Hessian | None,
             Jacobian | None,
+            Hessian | None,
             list[str],
             Trajectory,
         ]
@@ -403,6 +429,7 @@ class PoincareMap(Map):
         jac: Jacobian | None = None
         hes: Hessian | None = None
         jac_p: Jacobian | None = None
+        hes_p: Hessian | None = None
         history = [mode]
         traj = Trajectory()
         current = self.modes[mode]
@@ -415,11 +442,19 @@ class PoincareMap(Map):
                     hessian=hessian,
                     trajectory=trajectory,
                     param_keys=param_keys,
+                    mixed_hessian=mixed,
                 )
                 y = res.y
                 if jacobian:
-                    jac, hes, jac_p = _compose(
-                        jac, hes, jac_p, res.jac, res.hes, res.jac_p
+                    jac, hes, jac_p, hes_p = _compose(
+                        jac,
+                        hes,
+                        jac_p,
+                        hes_p,
+                        res.jac,
+                        res.hes,
+                        res.jac_p,
+                        res.hes_p,
                     )
                 if res.segment is not None:
                     traj.segments.append(res.segment)
@@ -432,7 +467,7 @@ class PoincareMap(Map):
                 raise RuntimeError(
                     f"no end mode reached after {self.max_transitions} transitions"
                 )
-            yield y, jac, hes, jac_p, history, traj
+            yield y, jac, hes, jac_p, hes_p, history, traj
 
     def image_detail(
         self,
@@ -444,13 +479,15 @@ class PoincareMap(Map):
         hessian: bool = False,
         trajectory: bool = False,
         parameter_jacobian: bool = False,
+        parameter_hessian: bool = False,
         mode: str | None = None,
     ) -> MapResult:
         """Compute the ``n``-th image of ``y0`` with derivatives.
 
         Parameters
         ----------
-        y0, params, n, jacobian, hessian, trajectory, parameter_jacobian
+        y0, params, n, jacobian, hessian, trajectory, parameter_jacobian, \
+        parameter_hessian
             See :meth:`Map.image_detail`.
         mode : str, optional
             Mode to start in instead of ``initial_mode``; useful when a
@@ -471,6 +508,8 @@ class PoincareMap(Map):
                 f"mode {start!r} expects a state of length "
                 f"{self.modes[start].dom_dim}, got {_y0.shape}"
             )
+        parameter_jacobian = parameter_jacobian or parameter_hessian
+        hessian = hessian or parameter_hessian
         keys = self.param_keys if parameter_jacobian else None
         runs = self._run(
             _y0,
@@ -481,13 +520,17 @@ class PoincareMap(Map):
             hessian,
             trajectory,
             keys,
+            parameter_hessian,
         )
-        y, jac, hes, jac_p, history, traj = collections.deque(runs, maxlen=1).pop()
+        y, jac, hes, jac_p, hes_p, history, traj = collections.deque(
+            runs, maxlen=1
+        ).pop()
         return MapResult(
             y,
             jac,
             hes,
             jac_p,
+            hes_p,
             keys if keys is not None else (),
             history,
             traj if trajectory else None,
@@ -576,6 +619,7 @@ class Diffeomorphism(Map):
         hessian: bool = False,
         trajectory: bool = False,
         parameter_jacobian: bool = False,
+        parameter_hessian: bool = False,
     ) -> MapResult:
         """Compute the ``n``-th image of ``y0``; see :meth:`Map.image_detail`."""
         return self._pmap.image_detail(
@@ -586,4 +630,5 @@ class Diffeomorphism(Map):
             hessian=hessian,
             trajectory=trajectory,
             parameter_jacobian=parameter_jacobian,
+            parameter_hessian=parameter_hessian,
         )

@@ -340,7 +340,8 @@ def test_local_bf_system_jacobian_izhikevich(izh_trace):
     start = izh_trace[int(np.argmin(np.abs(mu + 1)))]
     pmap = make_izhikevich_map(rtol=1e-10, atol=1e-12)
     var = np.concatenate([start.y, [start.params["I"], np.pi]])
-    _check_system_jacobian(pmap, var, start.params, "I", rtol=1e-4, atol=1e-6)
+    # fully analytic now (no finite difference left in the system Jacobian)
+    _check_system_jacobian(pmap, var, start.params, "I", h=1e-5, rtol=1e-5, atol=1e-6)
 
 
 def test_cofactor_matches_determinant_derivative():

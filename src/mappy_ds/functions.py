@@ -103,8 +103,9 @@ class SystemFunction:
     -----
     The function is traced with SymPy on first use. The Jacobian follows the
     convention ``jac[i, j] = ∂f_i/∂y_j``, the Hessian
-    ``hes[i, j, k] = ∂²f_i/(∂y_j ∂y_k)`` and the parameter Jacobian
-    ``jac_p[i, m] = ∂f_i/∂p_m`` with ``m`` indexing ``param_keys``.
+    ``hes[i, j, k] = ∂²f_i/(∂y_j ∂y_k)``, the parameter Jacobian
+    ``jac_p[i, m] = ∂f_i/∂p_m`` and the mixed Hessian
+    ``hes_p[i, j, m] = ∂²f_i/(∂y_j ∂p_m)``, with ``m`` indexing ``param_keys``.
     """
 
     def __init__(
@@ -197,6 +198,18 @@ class SystemFunction:
             return sympy.zeros(self.cod_dim, 0)
         return self.expression.jacobian(p)
 
+    @cached_property
+    def mixed_hessian_expression(self) -> sympy.Array:
+        """Symbolic mixed derivative ``∂²f/∂y∂p`` (``cod_dim × dom_dim × k``)."""
+        y, p = self._symbols
+        f = self.expression
+        return sympy.Array(
+            [
+                [[sympy.diff(f[i], yj, pm) for pm in p] for yj in y]
+                for i in range(self.cod_dim)
+            ]
+        )
+
     def _compile(self, expr: Any) -> Callable[..., Any]:
         y, p = self._symbols
         compiled: Callable[..., Any] = sympy.lambdify(
@@ -219,6 +232,10 @@ class SystemFunction:
     @cached_property
     def _jac_p(self) -> Callable[..., Any]:
         return self._compile(self.parameter_jacobian_expression)
+
+    @cached_property
+    def _hes_p(self) -> Callable[..., Any]:
+        return self._compile(self.mixed_hessian_expression)
 
     # -- numeric evaluation ------------------------------------------------
 
@@ -293,6 +310,30 @@ class SystemFunction:
             for m, key in enumerate(self.param_keys):
                 if key in keys:
                     out[:, keys.index(key)] = local[:, m]
+        return out
+
+    def mixed_hessian(self, y: StateLike, params: Params | None = None) -> Hessian:
+        """Evaluate ``∂²f/∂y∂p`` at ``y``; last axis in the order of ``param_keys``."""
+        return self.eval_mixed_hessian(as_state(y), self.params_array(params))
+
+    def eval_mixed_hessian(self, y: State, p: np.ndarray) -> Hessian:
+        """Mixed Hessian with a pre-extracted parameter array (hot path)."""
+        if not self.param_keys:
+            return np.zeros((self.cod_dim, self.dom_dim, 0))
+        return np.asarray(self._hes_p(y, p), dtype=np.float64).reshape(
+            self.cod_dim, self.dom_dim, len(self.param_keys)
+        )
+
+    def eval_mixed_hessian_for(
+        self, y: State, p: np.ndarray, keys: Sequence[str]
+    ) -> Hessian:
+        """Mixed Hessian with the last axis laid out along ``keys``."""
+        out = np.zeros((self.cod_dim, self.dom_dim, len(keys)))
+        if self.param_keys:
+            local = self.eval_mixed_hessian(y, p)
+            for m, key in enumerate(self.param_keys):
+                if key in keys:
+                    out[:, :, keys.index(key)] = local[:, :, m]
         return out
 
 

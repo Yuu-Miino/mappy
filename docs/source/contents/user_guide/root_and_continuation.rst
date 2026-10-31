@@ -193,12 +193,12 @@ and the argument :math:`\theta` of the critical multiplier from
 
 a system of :math:`\dim + 2` equations in :math:`\dim + 2` unknowns. The
 initial ``theta`` selects the kind of bifurcation (table above). The
-Jacobian of this system is supplied analytically: the fixed-point rows use
+Jacobian of this system is fully analytic: the fixed-point rows use
 :math:`DT^n - I` and the parameter derivative :attr:`MapResult.jac_p
 <mappy_ds.MapResult.jac_p>`, the determinant rows use Jacobi's formula with
-the Hessian of the map (for :math:`\bm y`) and the cofactor matrix (for
-:math:`\theta`); only :math:`\partial (DT^n)/\partial p` is replaced by a
-central difference.
+the Hessian of the map (for :math:`\bm y`), the mixed derivative
+:attr:`MapResult.hes_p <mappy_ds.MapResult.hes_p>` (for :math:`p`) and the
+cofactor matrix (for :math:`\theta`).
 
 .. code-block:: python
 
