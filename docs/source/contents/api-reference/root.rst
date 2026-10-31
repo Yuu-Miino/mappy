@@ -31,4 +31,5 @@ Local bifurcations
 
    find_local_bf
    trace_local_bf
+   trace_local_bf_arclength
    LocalBfResult

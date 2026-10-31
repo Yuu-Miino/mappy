@@ -19,6 +19,7 @@ from mappy_ds.root import (
     trace_cycle,
     trace_cycle_arclength,
     trace_local_bf,
+    trace_local_bf_arclength,
 )
 
 HENON_FIXED_POINT = np.array([0.631354477, 0.189406343])
@@ -452,3 +453,132 @@ def test_trace_cycle_arclength_callback_and_progress(capsys):
     assert len(steps) == 6 and len(seen) == 6
     err = capsys.readouterr().err
     assert "ARCLENGTH" in err and err.endswith("\n")
+
+
+# -- trace_local_bf_arclength -------------------------------------------------------
+
+
+@mapping(1)
+def cusp(x, p):
+    return x + p["l1"] + p["l2"] * x - x**3
+
+
+def test_trace_local_bf_arclength_cusp_fold_curve():
+    # fixed points: l1 + l2 x - x^3 = 0; fold where l2 = 3 x^2, i.e. l1 = -2 x^3
+    steps = trace_local_bf_arclength(
+        Diffeomorphism(cusp),
+        [0.5],
+        {"l1": -0.25, "l2": 0.75},
+        "l1",
+        0.0,
+        "l2",
+        direction=-1,
+        step=0.1,
+        step_max=0.2,
+        bounds=(-1.0, 0.75),
+    )
+    xs = np.array([s.y[0] for s in steps])
+    l1 = np.array([s.params["l1"] for s in steps])
+    l2 = np.array([s.params["l2"] for s in steps])
+    assert_allclose(l2, 3 * xs**2, atol=1e-9)
+    assert_allclose(l1, -2 * xs**3, atol=1e-9)
+    assert l2.min() < 0.1  # reached the neighbourhood of the cusp ...
+    assert xs[-1] < -0.3 and l1[-1] > 0  # ... and continued on the other branch
+    folds = [i for i, s in enumerate(steps) if "fold" in s.info["events"]]
+    assert len(folds) == 1 and abs(xs[folds[0]]) < 0.2
+    for s in steps:
+        assert s.info["theta"] == pytest.approx(0.0, abs=1e-9)
+        assert abs(s.info["eigvals"][0] - 1) < 1e-8  # multiplier +1 along a fold curve
+        assert {
+            "theta",
+            "eigvals",
+            "eigvecs",
+            "tangent",
+            "step",
+            "newton_iterations",
+            "events",
+        } <= set(s.info)
+        assert s.info["tangent"].shape == (4,)
+
+
+def test_trace_local_bf_arclength_henon_period_doubling_curve(henon_map):
+    params = {"a": 0.3675, "b": 0.3}
+    fp = find_cycle(henon_map, [0.5, 0.15], params).y
+    steps = trace_local_bf_arclength(
+        henon_map,
+        fp,
+        params,
+        "a",
+        np.pi,
+        "b",
+        direction=-1,
+        bounds=(-0.5, 0.3),
+        step=0.05,
+        step_max=0.2,
+    )
+    bs = np.array([s.params["b"] for s in steps])
+    assert bs[0] == pytest.approx(0.3) and bs[-1] < -0.4
+    for s in steps:
+        assert s.params["a"] == pytest.approx(
+            3 * (1 - s.params["b"]) ** 2 / 4, abs=1e-9
+        )
+        assert s.info["theta"] == pytest.approx(np.pi, abs=1e-9)
+        assert not s.info["events"]  # smooth curve, no fold, no resonance
+
+
+def test_trace_local_bf_arclength_izhikevich(izh_map_module):
+    params = {**IZH_PARAMS_I8, "I": 4.5869}
+    bf = find_local_bf(izh_map_module, [-6.79], params, "I", np.pi)
+    assert bf.success
+    steps = trace_local_bf_arclength(
+        izh_map_module,
+        bf.y,
+        bf.params,
+        "I",
+        np.pi,
+        "a",
+        bounds=(0.2, 0.3),
+        step=0.02,
+        step_max=0.1,
+    )
+    a_values = np.array([s.params["a"] for s in steps])
+    assert a_values[0] == pytest.approx(0.2) and a_values[-1] > 0.29
+    assert np.all(np.diff(a_values) > 0)
+    for s in steps:
+        assert abs(s.info["eigvals"][0] + 1) < 1e-6
+    # agrees with the natural-parameter continuation at the final a
+    nat = trace_local_bf(
+        izh_map_module,
+        bf.y,
+        bf.params,
+        "I",
+        np.pi,
+        "a",
+        float(a_values[-1]),
+        resolution=6,
+    )
+    assert nat[-1].params["I"] == pytest.approx(steps[-1].params["I"], abs=1e-6)
+
+
+def test_trace_local_bf_arclength_argument_errors(henon_map, henon_params):
+    with pytest.raises(ValueError, match="differ"):
+        trace_local_bf_arclength(henon_map, [0.6, 0.2], henon_params, "a", 0.0, "a")
+    with pytest.raises(ValueError, match="neither"):
+        trace_local_bf_arclength(henon_map, [0.6, 0.2], henon_params, "x", 0.0, "y")
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "expected"),
+    [
+        (0.1, -0.1, ["resonance_1_1"]),
+        (np.pi - 0.1, np.pi + 0.1, ["resonance_1_2"]),
+        (2 * np.pi / 3 - 0.1, 2 * np.pi / 3 + 0.1, ["resonance_1_3"]),
+        (np.pi / 2 - 0.1, np.pi / 2 + 0.1, ["resonance_1_4"]),
+        (0.3, 0.4, []),
+        (np.pi, np.pi, []),
+    ],
+)
+def test_resonance_events(before, after, expected):
+    from mappy_ds.root._local_bf import _resonance_events
+
+    assert _resonance_events(before, after) == expected

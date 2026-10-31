@@ -240,6 +240,58 @@ Each step's ``params`` holds both the continued and the solved parameter;
 ``y`` is the periodic point (without ``theta``); ``info`` holds ``theta``,
 ``eigvals``, ``eigvecs``, ``nfev`` and ``residual``.
 
+Bifurcation curves through cusps: ``trace_local_bf_arclength``
+================================================================
+
+Like :func:`~mappy_ds.root.trace_cycle`, :func:`~mappy_ds.root.trace_local_bf`
+prescribes the continuation parameter and therefore stops where the
+bifurcation curve turns back in it — as a fold curve does at a *cusp*.
+:func:`~mappy_ds.root.trace_local_bf_arclength` applies the pseudo-arclength
+method to the bifurcation conditions themselves: the :math:`d + 2` equations
+of :func:`~mappy_ds.root.find_local_bf` in the :math:`d + 3` unknowns
+:math:`u = (\bm y, \lambda_{\mathrm{bf}}, \theta, \lambda_{\mathrm{cnt}})`
+define a curve, followed with the fully analytic Jacobian (``jac``, ``hes``,
+``jac_p``, ``hes_p``).
+
+.. code-block:: python
+
+   >>> from mappy_ds.root import trace_local_bf_arclength
+   >>> curve = trace_local_bf_arclength(pmap, bf.y, bf.params, "I", bf.theta,
+   ...                                  "a", bounds=(0.2, 0.3), step=0.02)
+   >>> round(curve[-1].params["a"], 2), round(curve[-1].params["I"], 3)
+   (0.3, 3.841)
+
+``direction``, ``bounds`` and the step parameters refer to
+:math:`\lambda_{\mathrm{cnt}}` (here ``a``) exactly as in
+:func:`~mappy_ds.root.trace_cycle_arclength`. The events recorded in
+``info["events"]`` are those of a codimension-two analysis:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - event
+     - meaning
+   * - ``"fold"``
+     - the curve turns back in :math:`\lambda_{\mathrm{cnt}}`; on a fold
+       curve this is a cusp
+   * - ``"resonance_1_1"`` … ``"resonance_1_4"``
+     - on a Neimark–Sacker curve :math:`\theta` passes :math:`0`,
+       :math:`\pi`, :math:`2\pi/3` or :math:`\pi/2` (strong resonances;
+       at :math:`0` and :math:`\pi` the curve meets a fold or
+       period-doubling curve)
+   * - ``"second_multiplier_crossing"``
+     - the number of multipliers outside the unit circle changes: another
+       bifurcation curve is crossed (fold–flip, flip–Neimark–Sacker, …)
+
+The cusp normal form :math:`x \mapsto x + \lambda_1 + \lambda_2 x - x^3`
+illustrates the fold passing: its fold curve is :math:`\lambda_2 = 3x^2`,
+:math:`\lambda_1 = -2x^3`, a cusp at the origin of the parameter plane.
+Started on one branch with :math:`\lambda_2` decreasing, the continuation
+passes through :math:`x = 0` (``"fold"`` event) and returns along the other
+branch — see the docstring of
+:func:`~mappy_ds.root.trace_local_bf_arclength`.
+
 Reading ``ContinuationStep``
 ============================
 
@@ -256,7 +308,9 @@ parameter value:
 ``info``
    Extra data returned by the step function: for
    :func:`~mappy_ds.root.trace_cycle` ``eigvals``, ``eigvecs``, ``nfev`` and
-   ``residual``; :func:`~mappy_ds.root.trace_local_bf` adds ``theta``.
+   ``residual``; :func:`~mappy_ds.root.trace_local_bf` adds ``theta``; the
+   arclength continuations add ``tangent``, ``step``, ``newton_iterations``
+   and ``events``.
 
 A list of steps converts readily into arrays for plotting:
 
