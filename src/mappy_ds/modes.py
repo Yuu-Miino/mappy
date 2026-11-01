@@ -474,14 +474,15 @@ class ContinuousMode(Mode):
         """Account for the dependence of the hitting time on the initial state.
 
         With ``f`` the vector field, ``q`` the border function, ``J``, ``H``,
-        ``P`` and ``M`` the derivatives of the flow at the hitting time ``τ``,
-        the mode map ``y0 ↦ φ(τ(y0, p), y0, p)`` has Jacobian ``B J`` where
-        ``B = I - f ⊗ ∇q / (∇q · f)``, and parameter derivative
-        ``B P + G`` with ``G = -f ⊗ ∂q/∂p / (∇q · f)``. The Hessian and the
+        ``J_p`` and ``H_p`` the derivatives of the flow at the hitting time
+        ``τ``, the mode map ``y0 ↦ φ(τ(y0, p), y0, p)`` has Jacobian ``P J``
+        where ``P = I - f ⊗ ∇q / (∇q · f)`` is the projection along the flow
+        onto the tangent space of the border, and parameter derivative
+        ``P J_p + G`` with ``G = -f ⊗ ∂q/∂p / (∇q · f)``. The Hessian and the
         mixed derivative follow by differentiating once more with respect to
         ``y0``, taking ``∂τ/∂y0 = -(∇q J) / (∇q · f)`` into account; every
         quantity evaluated at the hitting point depends on ``y0`` through the
-        mode Jacobian ``B J``.
+        mode Jacobian ``P J``.
         """
         b = self.borders[border]
         pb = b.params_array(params)
@@ -492,21 +493,21 @@ class ContinuousMode(Mode):
             raise ZeroDivisionError(
                 f"border {b.__name__!r} of mode {self.name!r} is tangent to the flow"
             )
-        bmat = np.eye(self.dom_dim) - np.outer(f, q) / s
-        jac = bmat @ jac_flow
+        proj = np.eye(self.dom_dim) - np.outer(f, q) / s
+        jac = proj @ jac_flow
         jac_p = None
         qp = None
         if jac_p_flow is not None and keys is not None:
             qp = b.eval_parameter_jacobian_for(y1, pb, keys)[0]
-            jac_p = bmat @ jac_p_flow - np.outer(f, qp) / s
+            jac_p = proj @ jac_p_flow - np.outer(f, qp) / s
         if hes_flow is None and hes_p_flow is None:
             return jac, None, jac_p, None
 
         df = self.fun.eval_jacobian(y1, p)
         hq = b.eval_hessian(y1, pb)[0]
         ds = hq @ f + q @ df  # ∂s/∂y
-        # ∂B[a,d]/∂y_e
-        dbmat = (
+        # ∂P[a,d]/∂y_e
+        dproj = (
             -(np.einsum("ae,d->ade", df, q) + np.einsum("a,de->ade", f, hq)) / s
             + np.einsum("a,d,e->ade", f, q, ds) / s**2
         )
@@ -515,19 +516,19 @@ class ContinuousMode(Mode):
         hes = None
         if hes_flow is not None:
             djac_flow = hes_flow + np.einsum("db,c->dbc", df @ jac_flow, tau)
-            hes = np.einsum("ade,ec,db->abc", dbmat, jac, jac_flow) + np.einsum(
-                "ad,dbc->abc", bmat, djac_flow
+            hes = np.einsum("ade,ec,db->abc", dproj, jac, jac_flow) + np.einsum(
+                "ad,dbc->abc", proj, djac_flow
             )
 
         hes_p = None
         if hes_p_flow is not None and jac_p_flow is not None and keys is not None:
             assert qp is not None
-            # d/dy0 of B P: P(τ(y0), y0) depends on y0 through M and through τ
+            # d/dy0 of P J_p: J_p(τ(y0), y0) depends on y0 through H_p and through τ
             fp = self.fun.eval_parameter_jacobian_for(y1, p, keys)
-            dpdt = df @ jac_p_flow + fp  # ∂P/∂t at the hitting time
+            dpdt = df @ jac_p_flow + fp  # ∂J_p/∂t at the hitting time
             dpar = hes_p_flow + np.einsum("dm,b->dbm", dpdt, tau)
-            term_bp = np.einsum("ade,eb,dm->abm", dbmat, jac, jac_p_flow) + np.einsum(
-                "ad,dbm->abm", bmat, dpar
+            term_pj = np.einsum("ade,eb,dm->abm", dproj, jac, jac_p_flow) + np.einsum(
+                "ad,dbm->abm", proj, dpar
             )
             # d/dy0 of G = -f ⊗ q_p / s, all through the hitting point
             qxp = b.eval_mixed_hessian_for(y1, pb, keys)[0]  # ∂²q/∂y∂p (n, k)
@@ -535,5 +536,5 @@ class ContinuousMode(Mode):
                 -(np.einsum("ae,m->ame", df, qp) + np.einsum("a,em->ame", f, qxp)) / s
                 + np.einsum("a,m,e->ame", f, qp, ds) / s**2
             )
-            hes_p = term_bp + np.einsum("ame,eb->abm", dg, jac)
+            hes_p = term_pj + np.einsum("ame,eb->abm", dg, jac)
         return jac, hes, jac_p, hes_p
