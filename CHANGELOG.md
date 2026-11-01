@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   derivatives are written `∂_x`, `D` or `\dot{}` instead of Leibniz
   fractions, and division by the scalar `s = ∇q · f` is written as a
   `1/s` factor instead of a fraction with a matrix numerator.
+- Symbols in the same guide: the border projection (`B` in the reference
+  paper, `𝖡` before) is now written `P`, the usual symbol for a projection;
+  the flow sensitivities formerly written `P` and `M` are now `J_p` and
+  `H_p`, matching `jac_p` and `hes_p`. The internal variables in
+  `ContinuousMode` follow (`proj`, `dproj`).
 
 ## [0.3.0] - 2026-10-31
 

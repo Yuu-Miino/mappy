@@ -147,25 +147,26 @@ and therefore
 
 .. math::
 
-   DT = \mathsf{B}(\bm x_1)\, J(\tau), \qquad
-   \mathsf{B}(\bm x) = I - \frac{1}{s(\bm x)}\, \bm f(\bm x) \otimes \nabla q(\bm x).
+   DT = P(\bm x_1)\, J(\tau), \qquad
+   P(\bm x) = I - \frac{1}{s(\bm x)}\, \bm f(\bm x) \otimes \nabla q(\bm x).
 
-:math:`\mathsf{B}` (called :math:`B` in the reference paper; the sans-serif
-letter keeps it apart from the bilinear form :math:`B(\cdot,\cdot)` of
-:ref:`multilinear-forms`) is the projection along the flow onto the tangent
-space of the border. Differentiating once more,
+:math:`P` is the projection along the flow onto the tangent space of the
+border (:math:`P^2 = P`). The reference paper calls it :math:`B`; here it is
+written :math:`P`, the usual symbol for a projection, which also keeps it apart
+from the bilinear form :math:`B(\cdot,\cdot)` of :ref:`multilinear-forms`.
+Differentiating once more,
 
 .. math::
 
-   D^2 T = \parens{\partial_{\bm x}\mathsf{B}(\bm x_1)\, DT}\, J(\tau)
-         + \mathsf{B}(\bm x_1) \brackets{H(\tau)
+   D^2 T = \parens{\partial_{\bm x} P(\bm x_1)\, DT}\, J(\tau)
+         + P(\bm x_1) \brackets{H(\tau)
          + \parens{Df(\bm x_1)\, J(\tau)} \otimes \pderiv{\tau}{\bm x_0}},
 
 with
 
 .. math::
 
-   \pderiv{\mathsf{B}_{ad}}{x_e} =
+   \pderiv{P_{ad}}{x_e} =
    -\frac{(Df)_{ae}\, (\nabla q)_d + f_a\, (\nabla^2 q)_{de}}{s}
    + \frac{f_a\, (\nabla q)_d}{s^2}\pderiv{s}{x_e}, \qquad
    \pderiv{s}{\bm x} = \nabla^2 q\, \bm f + \nabla q\, Df.
@@ -192,11 +193,11 @@ derivatives with respect to the state only.
 
 For a discrete mode the parameter Jacobian :math:`\partial_p f` comes
 straight from SymPy. For a continuous mode the sensitivity
-:math:`P = \partial_p\bm\varphi` of the flow obeys
+:math:`J_p = \partial_p\bm\varphi` of the flow obeys
 
 .. math::
 
-   \dot P = Df(\bm\varphi)\, P + \partial_p \bm f(\bm\varphi), \qquad P(0) = 0,
+   \dot J_p = Df(\bm\varphi)\, J_p + \partial_p \bm f(\bm\varphi), \qquad J_p(0) = 0,
 
 which is integrated together with the state. At a border
 :math:`q(\bm x, p) = 0` the hitting time depends on the parameters too, both
@@ -205,10 +206,10 @@ through the trajectory and through the border itself, and the mode map
 
 .. math::
 
-   \partial_p T = \mathsf{B}\, P(\tau)
+   \partial_p T = P\, J_p(\tau)
                   - \frac{1}{s(\bm x_1)}\, \bm f(\bm x_1) \otimes \partial_p q(\bm x_1, p),
 
-with the same :math:`\mathsf{B}` and :math:`s` as in the border correction above. Compositions
+with the same :math:`P` and :math:`s` as in the border correction above. Compositions
 follow the chain rule :math:`\partial_p (g \circ f) = Dg\, \partial_p f +
 \partial_p g`.
 
@@ -232,26 +233,26 @@ involves :math:`\partial_p DT^n`), and what makes
 :func:`~mappy_ds.root.find_local_bf` fully analytic.
 
 For a continuous mode the sensitivity of the flow Jacobian,
-:math:`M = \partial_{\bm x_0} P = \partial_{\bm x_0}\partial_p\bm\varphi`, obeys
+:math:`H_p = \partial_{\bm x_0} J_p = \partial_{\bm x_0}\partial_p\bm\varphi`, obeys
 
 .. math::
 
-   \dot M_{ijm} = \sum_{l,r} (D^2 f)_{ilr} J_{lj} P_{rm}
+   \dot H_{p,ijm} = \sum_{l,r} (D^2 f)_{ilr} J_{lj} J_{p,rm}
                 + \sum_l (\partial_p Df)_{ilm} J_{lj}
-                + \sum_l (Df)_{il} M_{ljm}, \qquad M(0) = 0,
+                + \sum_l (Df)_{il} H_{p,ljm}, \qquad H_p(0) = 0,
 
 integrated with the state, and at a border the parameter derivative
-:math:`\partial_p T = \mathsf{B} P + G`, :math:`G = -s^{-1}\, \bm f \otimes \partial_p q`,
+:math:`\partial_p T = P J_p + G`, :math:`G = -s^{-1}\, \bm f \otimes \partial_p q`,
 is differentiated once more with respect to :math:`\bm x_0`. Every quantity
 evaluated at the hitting point :math:`\bm x_1` depends on :math:`\bm x_0`
-through the mode Jacobian :math:`J_T = \mathsf{B} J`, and :math:`P(\tau)` also through
+through the mode Jacobian :math:`J_T = P J`, and :math:`J_p(\tau)` also through
 :math:`\tau`:
 
 .. math::
 
    \partial_{\bm x_0}\partial_p T
-   = \parens{\partial_{\bm x}\mathsf{B}\, J_T} P
-   + \mathsf{B} \brackets{ M + \parens{Df\, P + \partial_p \bm f} \otimes \pderiv{\tau}{\bm x_0} }
+   = \parens{\partial_{\bm x} P\, J_T} J_p
+   + P \brackets{ H_p + \parens{Df\, J_p + \partial_p \bm f} \otimes \pderiv{\tau}{\bm x_0} }
    + \parens{\partial_{\bm x} G\, J_T},
 
 where
@@ -261,7 +262,7 @@ where
    \partial_{\bm x} G = -\frac{1}{s}\parens{Df \otimes \partial_p q + \bm f \otimes \partial^2_{\bm x p} q}
                       + \frac{1}{s^2}\, (\bm f \otimes \partial_p q) \otimes \partial_{\bm x} s,
 
-and :math:`\partial_{\bm x}\mathsf{B}` is as in the border correction above. The
+and :math:`\partial_{\bm x} P` is as in the border correction above. The
 last term vanishes for borders that do not depend on the parameters.
 Compositions follow :math:`\partial_p D(g \circ f) = D^2 g\,[Df, \partial_p f]
 + (\partial_p Dg)\, Df + Dg\, \partial_p Df`.
@@ -365,24 +366,24 @@ Border correction
 -----------------
 
 In the same notation the border correction of a continuous mode reads, with
-:math:`J = J(\tau)`, :math:`H = H(\tau)` the flow derivatives, :math:`\mathsf{B}
-= \mathsf{B}(\bm x_1)` the correction matrix and :math:`A = \mathsf{B} J` the
+:math:`J = J(\tau)`, :math:`H = H(\tau)` the flow derivatives, :math:`P
+= P(\bm x_1)` the projection and :math:`A = P J` the
 mode Jacobian:
 
 .. math::
 
-   A\bm x &= \mathsf{B}\, (J\bm x), \\
-   B_T(\bm x, \bm y) &= (\partial_{\bm x}\mathsf{B})(J\bm x, A\bm y)
-     + \mathsf{B}\brackets{H(\bm x, \bm y)
+   A\bm x &= P\, (J\bm x), \\
+   B_T(\bm x, \bm y) &= (\partial_{\bm x} P)(J\bm x, A\bm y)
+     + P\brackets{H(\bm x, \bm y)
      + \parens{Df(\bm x_1)\, J\bm x}\, \parens{\pderiv{\tau}{\bm x_0}\bm y}},
 
-where :math:`(\partial_{\bm x}\mathsf{B})(\bm u, \bm v)_a = \sum_{d,e}
-\partial\mathsf{B}_{ad}/\partial x_e\, u_d v_e`. The first-order correction
+where :math:`(\partial_{\bm x} P)(\bm u, \bm v)_a = \sum_{d,e}
+\partial P_{ad}/\partial x_e\, u_d v_e`. The first-order correction
 modifies the *linear* form (the flow Jacobian is projected along the flow),
 the second-order one modifies the *bilinear* form and brings in the
-third-order tensor :math:`\partial_{\bm x}\mathsf{B}`. The correction matrix
-is written :math:`\mathsf{B}` rather than the paper's :math:`B` precisely so
-that it does not collide with the bilinear form :math:`B(\cdot, \cdot)`.
+third-order tensor :math:`\partial_{\bm x} P`. The projection is written
+:math:`P` rather than the paper's :math:`B` precisely so that it does not
+collide with the bilinear form :math:`B(\cdot, \cdot)`.
 
 Example: period-doubling coefficient
 ------------------------------------
