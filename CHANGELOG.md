@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs
+
+- User guide "Jacobian and Hessian tensor": new section "Multilinear forms"
+  relating the index notation (`jac`, `hes`, `hes_p`, `einsum`) to
+  Kuznetsov's multilinear forms `A x`, `B(x, y)`, `C(x, y, z)`, `A_1(x, μ)`,
+  with a correspondence table, the chain rule and the border correction in
+  both notations and the period-doubling coefficient as an example; the
+  border correction matrix is now written `𝖡` to avoid the clash with
+  `B(·, ·)`. Linked from `MapResult`.
+
 ## [0.3.0] - 2026-10-31
 
 Mixed derivatives and pseudo-arclength continuation of bifurcation curves.

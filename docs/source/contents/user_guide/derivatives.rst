@@ -147,24 +147,26 @@ and therefore
 
 .. math::
 
-   DT = B(\bm x_1)\, J(\tau), \qquad
-   B(\bm x) = I - \frac{\bm f(\bm x) \otimes \nabla q(\bm x)}
+   DT = \mathsf{B}(\bm x_1)\, J(\tau), \qquad
+   \mathsf{B}(\bm x) = I - \frac{\bm f(\bm x) \otimes \nabla q(\bm x)}
                        {\nabla q(\bm x) \cdot \bm f(\bm x)}.
 
-:math:`B` is the projection along the flow onto the tangent space of the
-border. Differentiating once more,
+:math:`\mathsf{B}` (called :math:`B` in the reference paper; the sans-serif
+letter keeps it apart from the bilinear form :math:`B(\cdot,\cdot)` of
+:ref:`multilinear-forms`) is the projection along the flow onto the tangent
+space of the border. Differentiating once more,
 
 .. math::
 
-   D^2 T = \parens{\pderiv{B}{\bm x}(\bm x_1)\, DT}\, J(\tau)
-         + B(\bm x_1) \brackets{H(\tau)
+   D^2 T = \parens{\pderiv{\mathsf{B}}{\bm x}(\bm x_1)\, DT}\, J(\tau)
+         + \mathsf{B}(\bm x_1) \brackets{H(\tau)
          + \parens{Df(\bm x_1)\, J(\tau)} \otimes \pderiv{\tau}{\bm x_0}},
 
 with, writing :math:`s(\bm x) = \nabla q(\bm x) \cdot \bm f(\bm x)`,
 
 .. math::
 
-   \pderiv{B_{ad}}{x_e} =
+   \pderiv{\mathsf{B}_{ad}}{x_e} =
    -\frac{(Df)_{ae}\, (\nabla q)_d + f_a\, (\nabla^2 q)_{de}}{s}
    + \frac{f_a\, (\nabla q)_d}{s^2}\pderiv{s}{x_e}, \qquad
    \pderiv{s}{\bm x} = \nabla^2 q\, \bm f + \nabla q\, Df.
@@ -205,10 +207,10 @@ through the trajectory and through the border itself, and the mode map
 
 .. math::
 
-   \pderiv{T}{p} = B\, P(\tau) - \frac{\bm f(\bm x_1)}{\nabla q \cdot \bm f(\bm x_1)}
+   \pderiv{T}{p} = \mathsf{B}\, P(\tau) - \frac{\bm f(\bm x_1)}{\nabla q \cdot \bm f(\bm x_1)}
                    \otimes \pderiv{q}{p}(\bm x_1, p),
 
-with the same :math:`B` as in the border correction above. Compositions
+with the same :math:`\mathsf{B}` as in the border correction above. Compositions
 follow the chain rule :math:`\partial_p (g \circ f) = Dg\, \partial_p f +
 \partial_p g`.
 
@@ -241,23 +243,23 @@ For a continuous mode the sensitivity of the flow Jacobian,
                       + \sum_l (Df)_{il} M_{ljm}, \qquad M(0) = 0,
 
 integrated with the state, and at a border the parameter derivative
-:math:`\partial_p T = B P + G`, :math:`G = -\bm f \otimes \partial_p q / s`,
+:math:`\partial_p T = \mathsf{B} P + G`, :math:`G = -\bm f \otimes \partial_p q / s`,
 is differentiated once more with respect to :math:`\bm x_0`. Every quantity
 evaluated at the hitting point :math:`\bm x_1` depends on :math:`\bm x_0`
-through the mode Jacobian :math:`J_T = B J`, and :math:`P(\tau)` also through
+through the mode Jacobian :math:`J_T = \mathsf{B} J`, and :math:`P(\tau)` also through
 :math:`\tau`:
 
 .. math::
 
    \pderiv{(\partial_p T)}{\bm x_0}
-   = \parens{\pderiv{B}{\bm x} J_T} P
-   + B \brackets{ M + \parens{Df\, P + \partial_p \bm f} \otimes \pderiv{\tau}{\bm x_0} }
+   = \parens{\pderiv{\mathsf{B}}{\bm x} J_T} P
+   + \mathsf{B} \brackets{ M + \parens{Df\, P + \partial_p \bm f} \otimes \pderiv{\tau}{\bm x_0} }
    + \parens{\pderiv{G}{\bm x} J_T},
    \qquad
    \pderiv{G}{\bm x} = -\frac{Df \otimes \partial_p q + \bm f \otimes \partial^2_{\bm x p} q}{s}
                        + \frac{(\bm f \otimes \partial_p q) \otimes \partial_{\bm x} s}{s^2},
 
-with :math:`\partial B/\partial\bm x` as in the border correction above. The
+with :math:`\partial \mathsf{B}/\partial\bm x` as in the border correction above. The
 last term vanishes for borders that do not depend on the parameters.
 Compositions follow :math:`\partial_p D(g \circ f) = D^2 g\,[Df, \partial_p f]
 + (\partial_p Dg)\, Df + Dg\, \partial_p Df`.
@@ -265,6 +267,139 @@ Compositions follow :math:`\partial_p D(g \circ f) = D^2 g\,[Df, \partial_p f]
 :func:`~mappy_ds.root.find_local_bf` uses ``jac``, ``hes``, ``jac_p`` and
 ``hes_p`` to supply the root finder with a fully analytic Jacobian of the
 bifurcation conditions.
+
+.. _multilinear-forms:
+
+Multilinear forms
+=================
+
+The bifurcation literature (Kuznetsov, *Elements of Applied Bifurcation
+Theory*; Govaerts; MatCont) does not write derivatives with indices but as
+multilinear forms acting on vectors. The notation stems from the Fréchet
+derivative of functional analysis (Dieudonné; Iooss–Joseph; Chow–Hale;
+Golubitsky–Schaeffer) and was fixed for finite-dimensional numerics by
+Kuznetsov and MatCont; the index notation used on the rest of this page is
+the ``einsum`` convention of the implementation. The forms give the
+*definition*, the indices the *implementation*.
+
+Definitions
+-----------
+
+For :math:`\bm y = T(\bm x; p)` at a point :math:`\bm x_0`, with :math:`i`
+indexing the output, :math:`j, k, l` the state and :math:`m` the parameters:
+
+.. math::
+
+   (A\bm x)_i &= \sum_j \pderiv{T_i}{x_j}\, x_j,
+   & A &= DT(\bm x_0), \\
+   B(\bm x, \bm y)_i &= \sum_{j,k} \frac{\partial^2 T_i}{\partial x_j\,\partial x_k}\, x_j y_k,
+   & B(\bm x, \bm y) &= B(\bm y, \bm x), \\
+   C(\bm x, \bm y, \bm z)_i &= \sum_{j,k,l}
+     \frac{\partial^3 T_i}{\partial x_j\,\partial x_k\,\partial x_l}\, x_j y_k z_l, \\
+   A_1(\bm x, \bm\mu)_i &= \sum_{j,m} \frac{\partial^2 T_i}{\partial x_j\,\partial p_m}\, x_j \mu_m, \\
+   B(\bm q, \cdot)_{ij} &= \sum_k \frac{\partial^2 T_i}{\partial x_j\,\partial x_k}\, q_k,
+   & \pderiv{(DT)}{x_k} &= B(\cdot, \bm e_k).
+
+:math:`B(\bm q, \cdot)` is the matrix of the linear map
+:math:`\bm y \mapsto B(\bm q, \bm y)`, i.e. the derivative of the Jacobian
+:math:`DT` in the direction :math:`\bm q`. The trilinear form :math:`C` is
+listed for completeness only: third derivatives are not implemented in
+mappy-ds.
+
+Correspondence
+--------------
+
+With ``res = pmap.image_detail(x0, params, hessian=True,
+parameter_hessian=True)``, ``jac``, ``hes``, ``jac_p`` and ``hes_p`` taken
+from :class:`~mappy_ds.MapResult` and ``x``, ``y``, ``q``, ``mu`` NumPy arrays:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 40 40
+
+   * - Multilinear form
+     - Components
+     - mappy-ds
+   * - :math:`A\bm x`
+     - :math:`\sum_j \partial_{x_j} T_i\, x_j`
+     - ``jac @ x``
+   * - :math:`B(\bm x, \bm y)`
+     - :math:`\sum_{j,k} \partial_{x_j}\partial_{x_k} T_i\, x_j y_k`
+     - ``np.einsum("ijk,j,k->i", hes, x, y)``
+   * - :math:`A_1(\bm x, \bm\mu)`
+     - :math:`\sum_{j,m} \partial_{x_j}\partial_{p_m} T_i\, x_j \mu_m`
+     - ``np.einsum("ijm,j,m->i", hes_p, x, mu)``
+   * - :math:`B(\bm q, \cdot)`
+     - :math:`\sum_k \partial_{x_j}\partial_{x_k} T_i\, q_k`
+     - ``np.einsum("ijk,k->ij", hes, q)``
+   * - :math:`\partial_p T\, \bm\mu`
+     - :math:`\sum_m \partial_{p_m} T_i\, \mu_m`
+     - ``jac_p @ mu``
+
+Since ``hes`` is symmetric in its last two indices, the order of ``x`` and
+``y`` in the ``einsum`` call does not matter.
+
+Chain rule
+----------
+
+For a composition :math:`T = g \circ f` (subscripts name the map a form
+belongs to; :math:`Df`, :math:`\partial_p f` at :math:`\bm x_0` and the forms
+of :math:`g` at :math:`f(\bm x_0)`):
+
+.. math::
+
+   D(g \circ f)\, \bm x &= Dg\, (Df\, \bm x), \\
+   B_{g \circ f}(\bm x, \bm y) &= B_g(Df\, \bm x, Df\, \bm y) + Dg\, B_f(\bm x, \bm y), \\
+   A_{1, g \circ f}(\bm x, \bm\mu) &= B_g(Df\, \bm x, \partial_p f\, \bm\mu)
+     + A_{1,g}(Df\, \bm x, \bm\mu) + Dg\, A_{1,f}(\bm x, \bm\mu).
+
+These are the recurrences of :ref:`derivatives-composition` written without
+indices; in index form they are the ``einsum`` calls of ``_compose`` in
+``src/mappy_ds/maps.py``. For example the second line is
+``np.einsum("ilm,lj,mk->ijk", hes_g, jac_f, jac_f) + np.einsum("il,ljk->ijk",
+jac_g, hes_f)``.
+
+Border correction
+-----------------
+
+In the same notation the border correction of a continuous mode reads, with
+:math:`J = J(\tau)`, :math:`H = H(\tau)` the flow derivatives, :math:`\mathsf{B}
+= \mathsf{B}(\bm x_1)` the correction matrix and :math:`A = \mathsf{B} J` the
+mode Jacobian:
+
+.. math::
+
+   A\bm x &= \mathsf{B}\, (J\bm x), \\
+   B_T(\bm x, \bm y) &= (\partial_{\bm x}\mathsf{B})(J\bm x, A\bm y)
+     + \mathsf{B}\brackets{H(\bm x, \bm y)
+     + \parens{Df(\bm x_1)\, J\bm x}\, \parens{\pderiv{\tau}{\bm x_0}\bm y}},
+
+where :math:`(\partial_{\bm x}\mathsf{B})(\bm u, \bm v)_a = \sum_{d,e}
+\partial\mathsf{B}_{ad}/\partial x_e\, u_d v_e`. The first-order correction
+modifies the *linear* form (the flow Jacobian is projected along the flow),
+the second-order one modifies the *bilinear* form and brings in the
+third-order tensor :math:`\partial_{\bm x}\mathsf{B}`. The correction matrix
+is written :math:`\mathsf{B}` rather than the paper's :math:`B` precisely so
+that it does not collide with the bilinear form :math:`B(\cdot, \cdot)`.
+
+Example: period-doubling coefficient
+------------------------------------
+
+The forms appear naturally in normal-form coefficients. At a period-doubling
+point of a map, with :math:`A\bm q = -\bm q`, :math:`A^\top \bm p = -\bm p`
+and :math:`\langle \bm p, \bm q \rangle = 1`, the critical coefficient is
+
+.. math::
+
+   c = \frac16 \left\langle \bm p,\;
+       C(\bm q, \bm q, \bm q)
+       + 3 B\parens{\bm q, (I - A)^{-1} B(\bm q, \bm q)} \right\rangle,
+
+which needs :math:`B(\bm q, \bm q)` and :math:`B(\bm q, \cdot)` — both
+available from ``hes`` — and :math:`C(\bm q, \bm q, \bm q)`, which is not
+available in mappy-ds yet.
+
+.. _derivatives-composition:
 
 Composition
 ===========

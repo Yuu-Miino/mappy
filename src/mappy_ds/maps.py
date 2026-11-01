@@ -41,7 +41,9 @@ class MapResult:
         with ``m`` indexing ``param_keys``, if requested.
     hes_p : numpy.ndarray or None
         Mixed second derivative ``hes_p[i, j, m] = ∂²y_i/(∂y0_j ∂p_m)`` if
-        requested.
+        requested. ``hes`` and ``hes_p`` are the bilinear forms ``B(x, y)``
+        and ``A_1(x, μ)`` of the bifurcation literature; see
+        :ref:`multilinear-forms` for the correspondence.
     param_keys : tuple of str
         Parameters the columns of ``jac_p`` refer to (the map's
         :attr:`Map.param_keys`).
