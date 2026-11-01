@@ -110,18 +110,18 @@ Variational equations
 
 Let :math:`\bm\varphi(t, \bm x_0)` be the solution of
 :math:`\dot{\bm x} = \bm f(\bm x)` with :math:`\bm\varphi(0, \bm x_0) =
-\bm x_0`, and write :math:`J(t) = \pderiv{\bm\varphi}{\bm x_0}` and
-:math:`H(t) = \pderiv{J}{\bm x_0}`. Differentiating the ODE with respect to
+\bm x_0`, and write :math:`J(t) = \partial_{\bm x_0}\bm\varphi` and
+:math:`H(t) = \partial_{\bm x_0} J`. Differentiating the ODE with respect to
 the initial state gives the first and second variational equations
 
 .. math::
 
-   \deriv{J}{t} = Df(\bm\varphi)\, J, \qquad J(0) = I,
+   \dot J = Df(\bm\varphi)\, J, \qquad J(0) = I,
 
 .. math::
 
-   \deriv{H_{ijk}}{t} = \sum_{l,m} \parens{D^2 f(\bm\varphi)}_{ilm} J_{lj} J_{mk}
-                      + \sum_l \parens{Df(\bm\varphi)}_{il} H_{ljk},
+   \dot H_{ijk} = \sum_{l,m} \parens{D^2 f(\bm\varphi)}_{ilm} J_{lj} J_{mk}
+                + \sum_l \parens{Df(\bm\varphi)}_{il} H_{ljk},
    \qquad H(0) = 0,
 
 where :math:`Df` and :math:`D^2 f` are the symbolic Jacobian and Hessian of
@@ -135,21 +135,20 @@ Border correction
 The mode does not stop at a fixed time but at the hitting time
 :math:`\tau(\bm x_0)` of the border :math:`q(\bm x) = 0`. With
 :math:`\bm x_1 = \bm\varphi(\tau, \bm x_0)`, the mode map is
-:math:`T(\bm x_0) = \bm\varphi(\tau(\bm x_0), \bm x_0)`. Differentiating
+:math:`T(\bm x_0) = \bm\varphi(\tau(\bm x_0), \bm x_0)`. Writing
+:math:`s(\bm x) = \nabla q(\bm x) \cdot \bm f(\bm x)` and differentiating
 :math:`q(T(\bm x_0)) = 0` yields
 
 .. math::
 
-   \pderiv{\tau}{\bm x_0} = -\frac{\nabla q(\bm x_1)\, J(\tau)}
-                                  {\nabla q(\bm x_1) \cdot \bm f(\bm x_1)},
+   \pderiv{\tau}{\bm x_0} = -\frac{1}{s(\bm x_1)}\, \nabla q(\bm x_1)\, J(\tau),
 
 and therefore
 
 .. math::
 
    DT = \mathsf{B}(\bm x_1)\, J(\tau), \qquad
-   \mathsf{B}(\bm x) = I - \frac{\bm f(\bm x) \otimes \nabla q(\bm x)}
-                       {\nabla q(\bm x) \cdot \bm f(\bm x)}.
+   \mathsf{B}(\bm x) = I - \frac{1}{s(\bm x)}\, \bm f(\bm x) \otimes \nabla q(\bm x).
 
 :math:`\mathsf{B}` (called :math:`B` in the reference paper; the sans-serif
 letter keeps it apart from the bilinear form :math:`B(\cdot,\cdot)` of
@@ -158,11 +157,11 @@ space of the border. Differentiating once more,
 
 .. math::
 
-   D^2 T = \parens{\pderiv{\mathsf{B}}{\bm x}(\bm x_1)\, DT}\, J(\tau)
+   D^2 T = \parens{\partial_{\bm x}\mathsf{B}(\bm x_1)\, DT}\, J(\tau)
          + \mathsf{B}(\bm x_1) \brackets{H(\tau)
          + \parens{Df(\bm x_1)\, J(\tau)} \otimes \pderiv{\tau}{\bm x_0}},
 
-with, writing :math:`s(\bm x) = \nabla q(\bm x) \cdot \bm f(\bm x)`,
+with
 
 .. math::
 
@@ -193,12 +192,11 @@ derivatives with respect to the state only.
 
 For a discrete mode the parameter Jacobian :math:`\partial_p f` comes
 straight from SymPy. For a continuous mode the sensitivity
-:math:`P = \partial\varphi/\partial p` of the flow obeys
+:math:`P = \partial_p\bm\varphi` of the flow obeys
 
 .. math::
 
-   \deriv{P}{t} = \pderiv{\bm f}{\bm x}\parens{\varphi}\, P
-                  + \pderiv{\bm f}{p}\parens{\varphi}, \qquad P(0) = 0,
+   \dot P = Df(\bm\varphi)\, P + \partial_p \bm f(\bm\varphi), \qquad P(0) = 0,
 
 which is integrated together with the state. At a border
 :math:`q(\bm x, p) = 0` the hitting time depends on the parameters too, both
@@ -207,10 +205,10 @@ through the trajectory and through the border itself, and the mode map
 
 .. math::
 
-   \pderiv{T}{p} = \mathsf{B}\, P(\tau) - \frac{\bm f(\bm x_1)}{\nabla q \cdot \bm f(\bm x_1)}
-                   \otimes \pderiv{q}{p}(\bm x_1, p),
+   \partial_p T = \mathsf{B}\, P(\tau)
+                  - \frac{1}{s(\bm x_1)}\, \bm f(\bm x_1) \otimes \partial_p q(\bm x_1, p),
 
-with the same :math:`\mathsf{B}` as in the border correction above. Compositions
+with the same :math:`\mathsf{B}` and :math:`s` as in the border correction above. Compositions
 follow the chain rule :math:`\partial_p (g \circ f) = Dg\, \partial_p f +
 \partial_p g`.
 
@@ -234,16 +232,16 @@ involves :math:`\partial_p DT^n`), and what makes
 :func:`~mappy_ds.root.find_local_bf` fully analytic.
 
 For a continuous mode the sensitivity of the flow Jacobian,
-:math:`M = \partial^2\varphi/\partial\bm x_0\,\partial p`, obeys
+:math:`M = \partial_{\bm x_0} P = \partial_{\bm x_0}\partial_p\bm\varphi`, obeys
 
 .. math::
 
-   \deriv{M_{ijm}}{t} = \sum_{l,r} (D^2 f)_{ilr} J_{lj} P_{rm}
-                      + \sum_l (\partial_p Df)_{ilm} J_{lj}
-                      + \sum_l (Df)_{il} M_{ljm}, \qquad M(0) = 0,
+   \dot M_{ijm} = \sum_{l,r} (D^2 f)_{ilr} J_{lj} P_{rm}
+                + \sum_l (\partial_p Df)_{ilm} J_{lj}
+                + \sum_l (Df)_{il} M_{ljm}, \qquad M(0) = 0,
 
 integrated with the state, and at a border the parameter derivative
-:math:`\partial_p T = \mathsf{B} P + G`, :math:`G = -\bm f \otimes \partial_p q / s`,
+:math:`\partial_p T = \mathsf{B} P + G`, :math:`G = -s^{-1}\, \bm f \otimes \partial_p q`,
 is differentiated once more with respect to :math:`\bm x_0`. Every quantity
 evaluated at the hitting point :math:`\bm x_1` depends on :math:`\bm x_0`
 through the mode Jacobian :math:`J_T = \mathsf{B} J`, and :math:`P(\tau)` also through
@@ -251,15 +249,19 @@ through the mode Jacobian :math:`J_T = \mathsf{B} J`, and :math:`P(\tau)` also t
 
 .. math::
 
-   \pderiv{(\partial_p T)}{\bm x_0}
-   = \parens{\pderiv{\mathsf{B}}{\bm x} J_T} P
+   \partial_{\bm x_0}\partial_p T
+   = \parens{\partial_{\bm x}\mathsf{B}\, J_T} P
    + \mathsf{B} \brackets{ M + \parens{Df\, P + \partial_p \bm f} \otimes \pderiv{\tau}{\bm x_0} }
-   + \parens{\pderiv{G}{\bm x} J_T},
-   \qquad
-   \pderiv{G}{\bm x} = -\frac{Df \otimes \partial_p q + \bm f \otimes \partial^2_{\bm x p} q}{s}
-                       + \frac{(\bm f \otimes \partial_p q) \otimes \partial_{\bm x} s}{s^2},
+   + \parens{\partial_{\bm x} G\, J_T},
 
-with :math:`\partial \mathsf{B}/\partial\bm x` as in the border correction above. The
+where
+
+.. math::
+
+   \partial_{\bm x} G = -\frac{1}{s}\parens{Df \otimes \partial_p q + \bm f \otimes \partial^2_{\bm x p} q}
+                      + \frac{1}{s^2}\, (\bm f \otimes \partial_p q) \otimes \partial_{\bm x} s,
+
+and :math:`\partial_{\bm x}\mathsf{B}` is as in the border correction above. The
 last term vanishes for borders that do not depend on the parameters.
 Compositions follow :math:`\partial_p D(g \circ f) = D^2 g\,[Df, \partial_p f]
 + (\partial_p Dg)\, Df + Dg\, \partial_p Df`.
@@ -298,7 +300,7 @@ indexing the output, :math:`j, k, l` the state and :math:`m` the parameters:
      \frac{\partial^3 T_i}{\partial x_j\,\partial x_k\,\partial x_l}\, x_j y_k z_l, \\
    A_1(\bm x, \bm\mu)_i &= \sum_{j,m} \frac{\partial^2 T_i}{\partial x_j\,\partial p_m}\, x_j \mu_m, \\
    B(\bm q, \cdot)_{ij} &= \sum_k \frac{\partial^2 T_i}{\partial x_j\,\partial x_k}\, q_k,
-   & \pderiv{(DT)}{x_k} &= B(\cdot, \bm e_k).
+   & \partial_{x_k} DT &= B(\cdot, \bm e_k).
 
 :math:`B(\bm q, \cdot)` is the matrix of the linear map
 :math:`\bm y \mapsto B(\bm q, \bm y)`, i.e. the derivative of the Jacobian

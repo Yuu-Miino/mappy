@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   both notations and the period-doubling coefficient as an example; the
   border correction matrix is now written `𝖡` to avoid the clash with
   `B(·, ·)`. Linked from `MapResult`.
+- Derivative notation in the same guide: matrix- and tensor-valued
+  derivatives are written `∂_x`, `D` or `\dot{}` instead of Leibniz
+  fractions, and division by the scalar `s = ∇q · f` is written as a
+  `1/s` factor instead of a fraction with a matrix numerator.
 
 ## [0.3.0] - 2026-10-31
 
