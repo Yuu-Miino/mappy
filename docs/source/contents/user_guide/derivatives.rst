@@ -206,7 +206,7 @@ through the trajectory and through the border itself, and the mode map
 
 .. math::
 
-   \partial_p T = P\, J_p(\tau)
+   \partial_p T = P(\bm x_1)\, J_p(\tau)
                   - \frac{1}{s(\bm x_1)}\, \bm f(\bm x_1) \otimes \partial_p q(\bm x_1, p),
 
 with the same :math:`P` and :math:`s` as in the border correction above. Compositions
@@ -243,10 +243,12 @@ For a continuous mode the sensitivity of the flow Jacobian,
 
 integrated with the state, and at a border the parameter derivative
 :math:`\partial_p T = P J_p + G`, :math:`G = -s^{-1}\, \bm f \otimes \partial_p q`,
-is differentiated once more with respect to :math:`\bm x_0`. Every quantity
-evaluated at the hitting point :math:`\bm x_1` depends on :math:`\bm x_0`
-through the mode Jacobian :math:`J_T = P J`, and :math:`J_p(\tau)` also through
-:math:`\tau`:
+is differentiated once more with respect to :math:`\bm x_0`. Here :math:`P`,
+:math:`s`, :math:`\bm f`, :math:`Df`, :math:`\partial_p \bm f`, :math:`G` and the derivatives of :math:`q` are
+evaluated at the hitting point :math:`\bm x_1`, and :math:`J`, :math:`J_p`,
+:math:`H_p` at :math:`\tau`. Every quantity evaluated at :math:`\bm x_1` depends
+on :math:`\bm x_0` through the mode Jacobian :math:`J_T = P J`, and
+:math:`J_p(\tau)` also through :math:`\tau`:
 
 .. math::
 

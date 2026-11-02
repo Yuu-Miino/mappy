@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the flow sensitivities formerly written `P` and `M` are now `J_p` and
   `H_p`, matching `jac_p` and `hes_p`. The internal variables in
   `ContinuousMode` follow (`proj`, `dproj`).
+- Evaluation points in the parameter-derivative formulas of the same guide:
+  `∂_p T` writes `P(x_1)` like the other factors, and the mixed-derivative
+  section states that `P`, `s`, `f`, `Df`, `∂_p f`, `G` are evaluated at `x_1`
+  and `J`, `J_p`, `H_p` at `τ`.
 
 ## [0.3.0] - 2026-10-31
 
