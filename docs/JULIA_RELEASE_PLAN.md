@@ -522,8 +522,9 @@ Claude のセッションからは行えない，または行うべきでない�
       公開鍵を `doc.mappy` の **Settings → Deploy keys** に *Allow write
       access* で追加し，秘密鍵を `base64 -w0 mappyds_docs_key` した値を
       `MappyDS.jl` の secret **`DOCUMENTER_KEY`** に置く。両ファイルは削除。
-- [ ] Codecov で `MappyDS.jl` を有効にし，トークンを secret
-      **`CODECOV_TOKEN`** に置く。
+- [x] Codecov で `MappyDS.jl` を有効にし，トークンを secret
+      **`CODECOV_TOKEN`** に置く（2026-11-08 設定済み。CI からの
+      アップロード成功を確認）。
 - [ ] リポジトリ設定 **Actions → General** で "Allow GitHub Actions to
       create and approve pull requests" を有効にする（Dependabot / TagBot 用）。
 - [ ] 0.1.0 完成の報告を受けたら，`main` の該当コミットに
