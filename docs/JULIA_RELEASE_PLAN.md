@@ -6,9 +6,22 @@ General レジストリに登録し，Python 版と同じドキュメントサ�
 エコシステム（Julia 1.13.3 安定版 / 1.10.13 LTS，OrdinaryDiffEq v7，
 Documenter 1.20）を前提にしている。
 
+**決定事項（2026-11-08 ヒアリング済み）**
+
+| 項目 | 決定 |
+| --- | --- |
+| パッケージ名 | `MappyDS.jl`（モジュール `MappyDS`，リポジトリ `Yuu-Miino/MappyDS.jl`，既定ブランチ `main`） |
+| docs 配備先 | `doc.mappy/julia/`（Documenter `deploy_repo` + `dirname`） |
+| `Mode.step` の Julia 名 | `evolve` |
+| `param_keys` | パラメータ NamedTuple の全キー |
+| 初回登録 | 0.1.0 完成時に General へ登録 |
+| Julia compat | `julia = "1.10"`（LTS） |
+| フォーマッタ | Runic |
+| 実装体制 | Claude のセッションで実装し，人手は §11 のリポジトリ作成・secrets・登録コメントに限る |
+
 **要約**
 
-- パッケージ名は **`MappyDS.jl`**（モジュール `MappyDS`）を推奨する。`Mappy`
+- パッケージ名は **`MappyDS.jl`**（モジュール `MappyDS`）。`Mappy`
   は General の名前類似チェック（既存の `Snappy`，`MRphy` と編集距離 2）に
   掛かる見込みで，`MappyDS` は通過する。PyPI 名 `mappy-ds` とも揃う。
 - 導関数は Python 版と同じ**解析的な変分方程式＋境界補正**を移植する。
@@ -98,7 +111,7 @@ General レジストリの AutoMerge は新規パッケージ名に次を要求�
 | `HybridPoincare`，`ModeConcept` | 通過 | DL 距離 4 以内の既存名なし |
 | `HybridSystems` | 使用済み | blegat 氏のハイブリッドオートマトン基盤 |
 
-**推奨: `MappyDS.jl`**。理由は (1) PyPI 名 `mappy-ds`・docs サイト
+**決定: `MappyDS.jl`**。理由は (1) PyPI 名 `mappy-ds`・docs サイト
 `doc.mappy` との連続性，(2) 距離チェック通過，(3) 一般名詞
 （`PoincareMaps`）を占有しないこと。登録前に
 `AutoMerge.meets_distance_check("MappyDS", all_pkg_names)` で視覚距離まで
@@ -115,8 +128,7 @@ General レジストリの AutoMerge は新規パッケージ名に次を要求�
 - 雛形は PkgTemplates.jl 0.7 で生成する。プラグイン:
   `Git`, `License(MIT)`, `Tests(aqua=true, jet=true, project=true)`,
   `GitHubActions`, `Codecov`, `Documenter{GitHubActions}`, `TagBot`,
-  `Dependabot`, `Formatter(style="blue")` または `Runic`, `Citation`,
-  `ColPracBadge`。CompatHelper は保守モードなので使わない。
+  `Dependabot`, `Runic`, `Citation`, `ColPracBadge`。CompatHelper は保守モードなので使わない。
 - ライセンスは MIT を踏襲。
 
 ```
@@ -156,7 +168,7 @@ Python の「デコレータで宣言 → クラスに渡す → `image_detail`�
 | `param_keys`（トレースで発見） | `param_keys(map) = keys(p)` | §4.2。発見ではなく NamedTuple の全キー |
 | `ContinuousMode(name, fun, borders=..., max_interval, method, rtol, atol)` | `ContinuousMode(name, f; borders=(), max_interval=20.0, alg=Tsit5(), reltol=1e-6, abstol=1e-9, solver_kwargs...)` | `alg` は OrdinaryDiffEq の任意のアルゴリズム |
 | `DiscreteMode(name, fun)` | `DiscreteMode(name, f)` | |
-| `Mode.step(y0, params; jacobian, hessian, trajectory, param_keys, mixed_hessian)` | `evolve(mode, y0, p; jacobian, hessian, trajectory, param_keys, mixed_hessian) -> StepResult` | `Base.step` との衝突を避けて `evolve` |
+| `Mode.step(y0, params; jacobian, hessian, trajectory, param_keys, mixed_hessian)` | `evolve(mode, y0, p; jacobian, hessian, trajectory, param_keys, mixed_hessian) -> StepResult` | `Base.step` との衝突を避けて `evolve`（決定） |
 | `PoincareMap(modes, transitions, initial_mode; end_modes, max_transitions)` | 同名 | `transitions::Dict{Symbol, Union{Symbol, Vector{Symbol}, Dict{Symbol,Symbol}}}` |
 | `Diffeomorphism(fun)` | 同名 | |
 | `Map.image / image_detail / trajectory` | `image`, `image_detail`, `trajectory` | `MapResult` の `jac`, `hes`, `jac_p`, `hes_p` は `nothing` 許容 |
@@ -187,8 +199,8 @@ Python の「デコレータで宣言 → クラスに渡す → `image_detail`�
 n ≤ 10 の StaticArrays 上ではアロケーションなしで十分速い。
 
 Python 版が `p[key]` の読み取りから `param_keys` を発見していたのに対し，
-Julia 版は**パラメータ NamedTuple の全キー**を `param_keys` とする
-（使っていないパラメータの列は自動的に 0）。`eval_parameter_jacobian_for`
+Julia 版は**パラメータ NamedTuple の全キー**を `param_keys` とする（決定。
+使っていないパラメータの列は自動的に 0）。`eval_parameter_jacobian_for`
 の列合わせロジックが不要になる。
 
 Symbolics.jl（7.x）による式生成は，コード生成を望むユーザ向けに
@@ -280,7 +292,7 @@ ForwardDiff-through-`solve` と有限差分は**テストのオラクル**とし
 | test | `Test`, `Aqua` 0.8, `JET` 0.13, `JSON3`（参照値），`PythonCall` 0.9 + `CondaPkg`（任意） | |
 | docs | `Documenter` 1.20, `DocumenterInterLinks`, `DocumenterCitations`, `Literate` 2.21 | |
 
-- `julia = "1.10"`（LTS）。AutoMerge は compat の最小・最大 minor
+- `julia = "1.10"`（LTS，決定）。AutoMerge は compat の最小・最大 minor
   （1.10 と 1.13）で `import` を試すので両方で CI を回す。
 - `[compat]` は**全ての非 stdlib 依存に上限付き**で書く（AutoMerge 必須）。
   OrdinaryDiffEq 系は v7 の `VectorContinuousCallback` 符号修正後の版を下限に
@@ -443,22 +455,30 @@ deploydocs(;
 - `DocumenterCitations` で NOLTA 2024 論文を引用。
 - トップページに Python 版との機能対応表（§5）と API 対応表（§4.1）。
 
-## 9. スケジュール目安
+## 9. 進め方とスケジュール
 
-1 人が週 1〜2 日程度を充てる前提の作業週数。Phase 1 が最も重い。
+実装は Claude のセッションで行う。人手が要るのは §11 の作業（リポジトリ
+作成，secrets，Registrator へのコメント，レビュー）だけなので，期間は
+「セッション数」と「人手の待ち時間」で見積もる。1 セッションは数時間分の
+作業（実装・テスト・docs・コミット）を指す。
 
-| Phase | 内容 | 目安 |
-| --- | --- | --- |
-| 0 | 名前確定，リポジトリ・雛形・secrets・Registrator・docs 配備の疎通（空パッケージで `doc.mappy/julia/dev/` に出るところまで） | 1 週 |
-| 1 | 0.1.0 の実装（functions → modes → maps → root/continuation → docs），参照値 JSON の整備，登録申請 | 4〜5 週（＋AutoMerge 待機 3 日） |
-| 2 | 0.2.0（`jac_p`，擬弧長法） | 2 週 |
-| 3 | 0.3.0（`hes_p`，分岐曲線，Makie 拡張，例題 5 本） | 3〜4 週 |
-| 4 | Discourse の Package announcements への告知，JuliaHub docs 登録，Zenodo，フィードバック対応 | 継続 |
-| 5 | 1.0.0（API 凍結の判断） | 0.3.0 から 1 リリース以上後 |
+| Phase | 内容 | Claude 側 | 人手 |
+| --- | --- | --- | --- |
+| 0 | 計画確定，Julia 雛形（Project.toml，CI，TagBot，Dependabot，docs/make.jl，README，CHANGELOG），`doc.mappy/julia/dev/` への配備疎通 | 1〜2 セッション（本セッションで雛形まで） | リポジトリ作成，deploy key と secrets の設定（§11） |
+| 1 | 0.1.0 の実装（functions → modes → maps → root/continuation → docs），Python 側の参照値エクスポートと JSON 共有，登録申請 | 3〜5 セッション | 登録コメント，AutoMerge 待機 3 日 |
+| 2 | 0.2.0（`jac_p`，擬弧長法） | 2 セッション | 登録コメント |
+| 3 | 0.3.0（`hes_p`，分岐曲線，Makie 拡張，例題 5 本），Python 側の docs リンクと README 更新（Python 0.3.1） | 3〜4 セッション | 登録コメント |
+| 4 | Discourse の Package announcements，JuliaHub docs 登録，Zenodo，フィードバック対応 | 随時 | 告知文の確認 |
+| 5 | 1.0.0（API 凍結の判断） | 1 セッション | 判断 |
 
-Phase 1 の着手前に，`ContinuousCallback` 経由の到達時刻と Python 版の
-Izhikevich 参照値（y = −3.4783849356）が 1e-6 で一致することを最初の
-1 日で確認する（最大のリスク §10-1 の早期検証）。
+各セッションの終わりには CI が緑で，docs の `dev` が更新された状態に
+しておく（中断してもどこからでも再開できるようにする）。
+
+Phase 1 の最初のセッションで，`ContinuousCallback` 経由の到達時刻と Python
+版の Izhikevich 参照値（y = −3.4783849356）が 1e-6 で一致することを確認する
+（最大のリスク §10-1 の早期検証）。本セッションの環境からは Julia を取得
+できなかったので，雛形の動作確認は次回セッション（Julia が使える環境）で
+行う。
 
 ## 10. リスクと対策
 
@@ -485,16 +505,32 @@ Izhikevich 参照値（y = −3.4783849356）が 1e-6 で一致することを�
    Python 用とは別に発行する。
 8. **ライセンス**: ModelingToolkit v11 の AGPL 部分に依存しない（§4.2）。
 
-## 11. 決めてほしいこと
+## 11. 人手が必要な作業（チェックリスト）
 
-1. パッケージ名: **`MappyDS.jl`**（推奨）か，`HybridPoincare.jl` のような
-   説明的な名前か。
-2. docs の置き場所: `doc.mappy/julia/`（推奨，本計画の前提）か，
-   `MappyDS.jl` 自身の `gh-pages`（`GITHUB_TOKEN` だけで済み設定は簡単だが
-   サイトが分かれる）か。
-3. `Mode.step` の Julia 名: `evolve`（推奨）か，`Base.step` を拡張するか。
-4. パラメータの扱い: NamedTuple の全キーを `param_keys` とする簡略化
-   （推奨）でよいか，Python 版どおり「使ったものだけ」にするか。
-5. 0.1.0 の登録を Phase 1 の完了時に行うか，`dev` 配備だけで 0.3.0 相当まで
-   作ってから初登録するか（前者は 3 日待機を早く消化でき，後者は 0.x 間の
-   破壊的変更を避けやすい）。
+Claude のセッションからは行えない，または行うべきでない作業。
+
+- [ ] GitHub に空リポジトリ `Yuu-Miino/MappyDS.jl` を作成する（MIT，既定
+      ブランチ `main`，README は不要）。次回の Claude セッションにこの
+      リポジトリを添付する。
+- [ ] Registrator GitHub App（<https://github.com/apps/juliateam-registrator>）
+      を `MappyDS.jl` にインストールする。
+- [ ] `doc.mappy` 用の deploy key を新規発行する:
+      `ssh-keygen -t ed25519 -N "" -C "MappyDS docs deploy" -f mappyds_docs_key`。
+      公開鍵を `doc.mappy` の **Settings → Deploy keys** に *Allow write
+      access* で追加し，秘密鍵を `base64 -w0 mappyds_docs_key` した値を
+      `MappyDS.jl` の secret **`DOCUMENTER_KEY`** に置く。両ファイルは削除。
+- [ ] Codecov で `MappyDS.jl` を有効にし，トークンを secret
+      **`CODECOV_TOKEN`** に置く。
+- [ ] リポジトリ設定 **Actions → General** で "Allow GitHub Actions to
+      create and approve pull requests" を有効にする（Dependabot / TagBot 用）。
+- [ ] 0.1.0 完成の報告を受けたら，`main` の該当コミットに
+      `@JuliaRegistrator register` とコメントする（`Release notes:` 以下に
+      CHANGELOG の該当節を貼る）。以降の版も同じ。
+- [ ] 0.1.0 登録後，Zenodo の GitHub 連携を `MappyDS.jl` で有効にする。
+- [ ] 0.1.0 登録後，JuliaDocs/DocumentationGeneratorRegistry への PR
+      （Claude が用意する）を確認する。
+
+## 12. 変更履歴
+
+- 2026-11-08: 初版。ヒアリングの結果（名前・docs 配備先・`evolve`・
+  `param_keys`・登録時期・Julia compat・Runic・実装体制）を反映。
