@@ -1,0 +1,10 @@
+Manifest.toml
+Manifest-v*.toml
+docs/build/
+docs/site/
+docs/src/examples/*.md
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+/lcov.info
+.CondaPkg/

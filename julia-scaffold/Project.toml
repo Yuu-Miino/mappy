@@ -1,0 +1,34 @@
+name = "MappyDS"
+uuid = "dc692248-7fca-4550-9de6-3b8cf1554f02"
+authors = ["Yuu Miino"]
+version = "0.1.0-DEV"
+
+[deps]
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+OrdinaryDiffEqTsit5 = "b1df2697-797e-41e3-8120-5422d3b24e4a"
+OrdinaryDiffEqVerner = "79d7bb75-1356-48c1-b8c0-6832512096c2"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
+SimpleNonlinearSolve = "727e6d20-b764-4bd8-a329-72de5adea6c7"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[weakdeps]
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+
+[extensions]
+MappyDSMakieExt = "Makie"
+
+[compat]
+ForwardDiff = "1"
+LinearAlgebra = "1"
+Makie = "0.24"
+OrdinaryDiffEqTsit5 = "2"
+OrdinaryDiffEqVerner = "2"
+PrecompileTools = "1"
+Printf = "1"
+SciMLBase = "3"
+SimpleNonlinearSolve = "2"
+StaticArrays = "1"
+julia = "1.10"

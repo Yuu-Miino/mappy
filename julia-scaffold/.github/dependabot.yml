@@ -1,0 +1,30 @@
+# Dependabot supports Julia since December 2025 and replaces CompatHelper
+# (which is in maintenance mode). Updates are grouped so that one PR per
+# ecosystem arrives per week, as in the Python repository.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    labels:
+      - dependencies
+  - package-ecosystem: julia
+    directories:
+      - /
+      - /docs
+      - /test
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      julia-dependencies:
+        patterns:
+          - "*"
+    labels:
+      - dependencies

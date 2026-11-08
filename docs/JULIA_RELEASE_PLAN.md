@@ -464,7 +464,7 @@ deploydocs(;
 
 | Phase | 内容 | Claude 側 | 人手 |
 | --- | --- | --- | --- |
-| 0 | 計画確定，Julia 雛形（Project.toml，CI，TagBot，Dependabot，docs/make.jl，README，CHANGELOG），`doc.mappy/julia/dev/` への配備疎通 | 1〜2 セッション（本セッションで雛形まで） | リポジトリ作成，deploy key と secrets の設定（§11） |
+| 0 | 計画確定，Julia 雛形（Project.toml，CI，TagBot，Dependabot，docs/make.jl，README，CHANGELOG），`doc.mappy/julia/dev/` への配備疎通 | 1〜2 セッション（本セッションで雛形まで。雛形は一時的に `mappy` の `julia-scaffold/` に置き，`SCAFFOLD_README.md` の手順で新リポジトリへ移す） | リポジトリ作成，deploy key と secrets の設定（§11） |
 | 1 | 0.1.0 の実装（functions → modes → maps → root/continuation → docs），Python 側の参照値エクスポートと JSON 共有，登録申請 | 3〜5 セッション | 登録コメント，AutoMerge 待機 3 日 |
 | 2 | 0.2.0（`jac_p`，擬弧長法） | 2 セッション | 登録コメント |
 | 3 | 0.3.0（`hes_p`，分岐曲線，Makie 拡張，例題 5 本），Python 側の docs リンクと README 更新（Python 0.3.1） | 3〜4 セッション | 登録コメント |
@@ -534,3 +534,5 @@ Claude のセッションからは行えない，または行うべきでない�
 
 - 2026-11-08: 初版。ヒアリングの結果（名前・docs 配備先・`evolve`・
   `param_keys`・登録時期・Julia compat・Runic・実装体制）を反映。
+  Phase 0 の雛形を `julia-scaffold/` に生成（依存の UUID と compat は
+  General レジストリから取得。Julia 本体はこの環境で未実行）。
