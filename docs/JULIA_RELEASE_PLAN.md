@@ -436,6 +436,9 @@ deploydocs(;
 
 - 配備先が別リポジトリなので `GITHUB_TOKEN` では押せず，**SSH の
   `DOCUMENTER_KEY`** が必須（Documenter のホスティング手引きどおり）。
+  Documenter 1.20 の `deploy_repo` + `dirname` でこの構成が動くことを
+  2026-11-08 に確認済み（`gh-pages` に `julia/dev/`，`julia/versions.js`，
+  `julia/index.html` が作られ，Python 側のディレクトリは無傷）。
 - 生成されるレイアウトは `julia/stable`（最新版へのシンボリックリンク），
   `julia/v0.1/`，`julia/dev/`，`julia/versions.js`，`julia/index.html`
   （リダイレクト）。Documenter は `dirname` 配下しか消さないので，Python
@@ -464,7 +467,7 @@ deploydocs(;
 
 | Phase | 内容 | Claude 側 | 人手 |
 | --- | --- | --- | --- |
-| 0 | 計画確定，Julia 雛形（Project.toml，CI，TagBot，Dependabot，docs/make.jl，README，CHANGELOG），`doc.mappy/julia/dev/` への配備疎通 | 1〜2 セッション（本セッションで雛形まで。雛形は `MappyDS.jl` の `main` にプッシュ済み） | リポジトリ作成，deploy key と secrets の設定（§11） |
+| 0 | 計画確定，Julia 雛形（Project.toml，CI，TagBot，Dependabot，docs/make.jl，README，CHANGELOG），`doc.mappy/julia/dev/` への配備疎通 | **完了（2026-11-08）**: 雛形を `MappyDS.jl` の `main` にプッシュし，CI（LTS / 1.13 / pre，macOS / Windows，Runic，Aqua，JET，ExplicitImports，docs，doctest）が全て成功，`doc.mappy/julia/dev/` に配備済み | リポジトリ作成，deploy key と secrets の設定（§11） |
 | 1 | 0.1.0 の実装（functions → modes → maps → root/continuation → docs），Python 側の参照値エクスポートと JSON 共有，登録申請 | 3〜5 セッション | 登録コメント，AutoMerge 待機 3 日 |
 | 2 | 0.2.0（`jac_p`，擬弧長法） | 2 セッション | 登録コメント |
 | 3 | 0.3.0（`hes_p`，分岐曲線，Makie 拡張，例題 5 本），Python 側の docs リンクと README 更新（Python 0.3.1） | 3〜4 セッション | 登録コメント |
@@ -513,7 +516,8 @@ Claude のセッションからは行えない，または行うべきでない�
       ブランチ `main`）。2026-11-08 作成，雛形プッシュ済み。
 - [ ] Registrator GitHub App（<https://github.com/apps/juliateam-registrator>）
       を `MappyDS.jl` にインストールする。
-- [ ] `doc.mappy` 用の deploy key を新規発行する:
+- [x] `doc.mappy` 用の deploy key を新規発行する（2026-11-08 設定済み。
+      docs ジョブから `julia/dev/` への配備を確認）:
       `ssh-keygen -t ed25519 -N "" -C "MappyDS docs deploy" -f mappyds_docs_key`。
       公開鍵を `doc.mappy` の **Settings → Deploy keys** に *Allow write
       access* で追加し，秘密鍵を `base64 -w0 mappyds_docs_key` した値を
@@ -533,6 +537,9 @@ Claude のセッションからは行えない，または行うべきでない�
 
 - 2026-11-08: 初版。ヒアリングの結果（名前・docs 配備先・`evolve`・
   `param_keys`・登録時期・Julia compat・Runic・実装体制）を反映。
-  Phase 0 の雛形を生成して `Yuu-Miino/MappyDS.jl` の `main` にプッシュ
-  （依存の UUID と compat は General レジストリから取得。Julia 本体は
-  この環境で未実行）。
+  Phase 0 の雛形を生成して `Yuu-Miino/MappyDS.jl` の `main` にプッシュ。
+  CI を緑にするまでに直した点: `Test` stdlib の UUID，JET の Julia 版
+  ごとの compat（0.9 が 1.10 用）と `target_defined_modules` の廃止，
+  DocumenterInterLinks のプロジェクト名は英数字のみ，ExplicitImports
+  対策で依存は `import X` で読み込む，Runic の整形。docs は
+  `doc.mappy/julia/dev/` に配備済み。
