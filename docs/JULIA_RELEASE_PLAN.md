@@ -468,7 +468,7 @@ deploydocs(;
 | Phase | 内容 | Claude 側 | 人手 |
 | --- | --- | --- | --- |
 | 0 | 計画確定，Julia 雛形（Project.toml，CI，TagBot，Dependabot，docs/make.jl，README，CHANGELOG），`doc.mappy/julia/dev/` への配備疎通 | **完了（2026-11-08）**: 雛形を `MappyDS.jl` の `main` にプッシュし，CI（LTS / 1.13 / pre，macOS / Windows，Runic，Aqua，JET，ExplicitImports，docs，doctest）が全て成功，`doc.mappy/julia/dev/` に配備済み | リポジトリ作成，deploy key と secrets の設定（§11） |
-| 1 | 0.1.0 の実装（functions → modes → maps → root/continuation → docs），Python 側の参照値エクスポートと JSON 共有，登録申請 | 3〜5 セッション | 登録コメント，AutoMerge 待機 3 日 |
+| 1 | 0.1.0 の実装（functions → modes → maps → root/continuation → docs），Python 側の参照値エクスポートと JSON 共有，登録申請 | **実装完了（2026-11-08，1 セッション）**: `MappyDS.jl` `main` の `Release 0.1.0` コミットで CI 全ジョブ成功（単体テスト 810 件，Python 版の参照値と 1e-6〜1e-7 で一致）。`tests/export_reference.py` を Python 側に追加 | 登録コメント（未），AutoMerge 待機 3 日 |
 | 2 | 0.2.0（`jac_p`，擬弧長法） | 2 セッション | 登録コメント |
 | 3 | 0.3.0（`hes_p`，分岐曲線，Makie 拡張，例題 5 本），Python 側の docs リンクと README 更新（Python 0.3.1） | 3〜4 セッション | 登録コメント |
 | 4 | Discourse の Package announcements，JuliaHub docs 登録，Zenodo，フィードバック対応 | 随時 | 告知文の確認 |
@@ -527,7 +527,7 @@ Claude のセッションからは行えない，または行うべきでない�
       アップロード成功を確認）。
 - [ ] リポジトリ設定 **Actions → General** で "Allow GitHub Actions to
       create and approve pull requests" を有効にする（Dependabot / TagBot 用）。
-- [ ] 0.1.0 完成の報告を受けたら，`main` の該当コミットに
+- [ ] 0.1.0 完成の報告を受けたら，`main` の該当コミット（`Release 0.1.0`）に
       `@JuliaRegistrator register` とコメントする（`Release notes:` 以下に
       CHANGELOG の該当節を貼る）。以降の版も同じ。
 - [ ] 0.1.0 登録後，Zenodo の GitHub 連携を `MappyDS.jl` で有効にする。
@@ -536,6 +536,10 @@ Claude のセッションからは行えない，または行うべきでない�
 
 ## 12. 変更履歴
 
+- 2026-11-08 (2): Phase 1 の実装完了を記録。CI を緑にするまでに直した点:
+  JET は SciML 内部の抽象解析で誤検出が多いため `target_modules` で自パッケージに
+  限定，`StepFunctionResult` は非パラメトリック型に，軌道の最終サンプルは
+  モード終了状態で上書き，`find_cycle` は特異ヤコビアン等の例外を失敗結果に変換。
 - 2026-11-08: 初版。ヒアリングの結果（名前・docs 配備先・`evolve`・
   `param_keys`・登録時期・Julia compat・Runic・実装体制）を反映。
   Phase 0 の雛形を生成して `Yuu-Miino/MappyDS.jl` の `main` にプッシュ。
