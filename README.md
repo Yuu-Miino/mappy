@@ -127,6 +127,13 @@ adding time as a state and resetting it on a section — see [`examples/`](examp
 
 <https://yuu-miino.github.io/doc.mappy/latest/>
 
+## Julia
+
+A Julia port, [MappyDS.jl](https://github.com/Yuu-Miino/MappyDS.jl), follows
+this package release by release (documentation at
+<https://yuu-miino.github.io/doc.mappy/julia/stable/>); see
+[`docs/JULIA_RELEASE_PLAN.md`](docs/JULIA_RELEASE_PLAN.md).
+
 ## Development
 
 ```bash

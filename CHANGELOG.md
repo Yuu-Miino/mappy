@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `tests/export_reference.py` exports converged reference values of the
+  test systems for the Julia port, [MappyDS.jl](https://github.com/Yuu-Miino/MappyDS.jl);
+  the documentation links to the Julia docs under `julia/` of the same site.
+
 ## [0.3.0] - 2026-10-31
 
 Mixed derivatives and pseudo-arclength continuation of bifurcation curves.
