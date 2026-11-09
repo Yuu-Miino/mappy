@@ -539,7 +539,77 @@ Claude のセッションからは行えない，または行うべきでない�
 - [ ] 0.1.0 登録後，JuliaDocs/DocumentationGeneratorRegistry への PR
       （Claude が用意する）を確認する。
 
-## 12. 変更履歴
+## 12. Phase 4 の準備資料
+
+### 12.1 JuliaHub の docs リンク（DocumentationGeneratorRegistry）
+
+JuliaHub は既定で docs を自前ビルドしようとするが，MappyDS の docs は
+`doc.mappy` に配備しているので「hosted」として登録する。
+<https://github.com/JuliaDocs/DocumentationGeneratorRegistry> をフォークし，
+`Registry.toml` の末尾に次を追記して PR を出す（0.1.0 が General に入った後）:
+
+```toml
+[dc692248-7fca-4550-9de6-3b8cf1554f02]
+name = "MappyDS"
+location = "https://yuu-miino.github.io/doc.mappy/julia/stable"
+method = "hosted"
+```
+
+PR のタイトルは `Add MappyDS` で足りる。CI が TOML と URL を検査する。
+
+### 12.2 Discourse 告知文案（Package announcements）
+
+タイトル: `[ANN] MappyDS.jl: Poincaré maps of hybrid dynamical systems with analytic derivatives`
+
+本文（英語，そのまま貼れる）:
+
+> MappyDS.jl is a Julia port of the Python package `mappy-ds`. It implements the *mode concept*
+> (Miino, NOLTA IEICE 15(2), 2024): a hybrid/piecewise-smooth system is written as a graph of
+> *modes* (ODE flows that end on a border, or discrete maps), and the package composes them
+> into a Poincaré map `T` together with its derivatives.
+>
+> What you get for a `PoincareMap` or a plain `Diffeomorphism`:
+>
+> - `image_detail(T, y0, p)`: the image, the Jacobian `DT` and the Hessian, plus parameter
+>   derivatives and mixed second derivatives on request. Flows use the variational equations
+>   with the analytic border correction (no AD through the ODE solver); user functions are
+>   differentiated with ForwardDiff on `SVector`s.
+> - `find_cycle`, `trace_cycle`, `trace_cycle_arclength`: periodic points and their
+>   continuation (natural parameter or pseudo-arclength, with fold / period-doubling /
+>   Neimark–Sacker detection).
+> - `find_local_bf`, `trace_local_bf`, `trace_local_bf_arclength`: local bifurcation points
+>   solved from `(Tⁿ(y) − y, det(DTⁿ − e^{iθ}I))` with a fully analytic Jacobian, and their
+>   continuation in two parameters (cusps, strong resonances flagged).
+> - A Makie extension: `plot_trajectory` and an interactive `plot2d` viewer (GLMakie).
+>
+> Built on OrdinaryDiffEqTsit5, SciMLBase callbacks, SimpleNonlinearSolve, ForwardDiff and
+> StaticArrays. Julia 1.10+.
+>
+> Docs with five worked examples (Hénon, coupled logistic maps, Izhikevich neuron, forced
+> Duffing and Alpazur oscillators): https://yuu-miino.github.io/doc.mappy/julia/stable/
+> Repository: https://github.com/Yuu-Miino/MappyDS.jl
+> Python package: https://github.com/Yuu-Miino/mappy
+>
+> Feedback on the API is welcome: the package is at 0.3 and the API will be frozen for 1.0
+> once it has settled.
+
+投稿は 0.3.0 が General に入り，`stable/` の docs が 0.3.0 を指してから。
+
+### 12.3 Zenodo
+
+1. <https://zenodo.org/account/settings/github/> で `Yuu-Miino/MappyDS.jl` を ON にする。
+2. 以降，TagBot が GitHub Release を作るたびに Zenodo が DOI を発行する
+   （既に打たれた `v0.1.0` 等は，Release を一度編集・保存すれば取り込まれる）。
+3. 発行された concept DOI を `README.md` のバッジと `CITATION.bib` に入れる
+   （Claude が次のセッションで行う）。
+
+### 12.4 登録 PR の確認方法
+
+General の PR には AutoMerge がガイドライン判定をコメントする。「new package」は
+判定が全て通っていれば 3 日後に自動マージされる。名前の類似度などで止まった
+場合はコメントに理由が出るので，その文面を Claude に渡せば対処案を出す。
+
+## 13. 変更履歴
 
 - 2026-11-09 (2): Phase 3（0.3.0）の実装完了。`release-0.3` で CI を緑にして
   `main` に ff マージ。直した点: Makie 拡張は ExplicitImports のため
