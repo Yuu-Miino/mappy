@@ -138,7 +138,10 @@ html_theme_options = {
     ],
     # The Julia port (MappyDS.jl) is documented on the same site under julia/.
     "external_links": [
-        {"name": "Julia (MappyDS.jl)", "url": "https://yuu-miino.github.io/doc.mappy/julia/stable/"},
+        {
+            "name": "Julia (MappyDS.jl)",
+            "url": "https://yuu-miino.github.io/doc.mappy/julia/stable/",
+        },
     ],
     "switcher": {
         "version_match": version,
