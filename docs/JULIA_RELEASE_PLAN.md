@@ -527,9 +527,10 @@ Claude のセッションからは行えない，または行うべきでない�
       アップロード成功を確認）。
 - [ ] リポジトリ設定 **Actions → General** で "Allow GitHub Actions to
       create and approve pull requests" を有効にする（Dependabot / TagBot 用）。
-- [ ] `main` の `Release 0.1.0` コミット（`ebca9d1`）に
-      `@JuliaRegistrator register` とコメントする（`Release notes:` 以下に
-      CHANGELOG の該当節を貼る）。新規パッケージは AutoMerge まで 3 日待機。
+- [x] `main` の `Release 0.1.0` コミット（`ebca9d1`）に
+      `@JuliaRegistrator register` とコメントする（2026-11-09 実施。登録 PR:
+      <https://github.com/JuliaRegistries/General/pull/175403>。新規パッケージは
+      AutoMerge まで 3 日待機）。
 - [ ] 0.1.0 のマージ後，`Release 0.2.0`（`69c009c`），続いて `Release 0.3.0`
       （`9147f6a`）のコミットにも同じコメントをする（既存パッケージの新版は
       通常数十分で AutoMerge）。各版の TagBot がタグとリリースを作り，docs の
