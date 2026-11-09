@@ -611,6 +611,10 @@ General の PR には AutoMerge がガイドライン判定をコメントする
 
 ## 13. 変更履歴
 
+- 2026-11-09 (3): 0.1.0 の登録 PR（General #175403）が立ち，AutoMerge の
+  3 日タイマーが開始。Phase 4 の資料（§12: JuliaHub の docs 登録エントリ，
+  Discourse 告知文案，Zenodo 手順）を追加。MappyDS.jl に `CONTRIBUTING.md`
+  （開発手順とリリース手順，§6.2 の内容）と Codecov バッジを追加。
 - 2026-11-09 (2): Phase 3（0.3.0）の実装完了。`release-0.3` で CI を緑にして
   `main` に ff マージ。直した点: Makie 拡張は ExplicitImports のため
   `using Makie: Axis, ...` と明示し，描画クロージャ名が Makie の `update!` と
