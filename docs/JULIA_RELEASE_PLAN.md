@@ -470,7 +470,7 @@ deploydocs(;
 | 0 | 計画確定，Julia 雛形（Project.toml，CI，TagBot，Dependabot，docs/make.jl，README，CHANGELOG），`doc.mappy/julia/dev/` への配備疎通 | **完了（2026-11-08）**: 雛形を `MappyDS.jl` の `main` にプッシュし，CI（LTS / 1.13 / pre，macOS / Windows，Runic，Aqua，JET，ExplicitImports，docs，doctest）が全て成功，`doc.mappy/julia/dev/` に配備済み | リポジトリ作成，deploy key と secrets の設定（§11） |
 | 1 | 0.1.0 の実装（functions → modes → maps → root/continuation → docs），Python 側の参照値エクスポートと JSON 共有，登録申請 | **実装完了（2026-11-08，1 セッション）**: `MappyDS.jl` `main` の `Release 0.1.0` コミットで CI 全ジョブ成功（単体テスト 810 件，Python 版の参照値と 1e-6〜1e-7 で一致）。`tests/export_reference.py` を Python 側に追加 | 登録コメント（未），AutoMerge 待機 3 日 |
 | 2 | 0.2.0（`jac_p`，擬弧長法） | **実装完了（2026-11-09）**: `MappyDS.jl` `main` の `Release 0.2.0` コミット。補正子は ODE 写像のノイズ床に対応するため「残差が改善しなくなった時点で最良点を採用」する判定を追加 | 登録コメント（0.1.0 の 3 日待機後） |
-| 3 | 0.3.0（`hes_p`，分岐曲線，Makie 拡張，例題 5 本），Python 側の docs リンクと README 更新（Python 0.3.1） | 3〜4 セッション | 登録コメント |
+| 3 | 0.3.0（`hes_p`，分岐曲線，Makie 拡張，例題 5 本），Python 側の docs リンクと README 更新（Python 0.3.1） | **実装完了（2026-11-09）**: `MappyDS.jl` `main` の `Release 0.3.0` コミット（単体テスト 1,860 件，全ジョブ成功）。`examples/` 5 本は Literate.jl で書き，docs の「Working examples」でビルド時に実行（Alpazur の PD 点 B1 ≈ 9.08 を含む）。Python 側は docs のナビと README から Julia 版へリンク済み | 登録コメント（0.1.0 → 0.2.0 → 0.3.0 の順，各 AutoMerge 後） |
 | 4 | Discourse の Package announcements，JuliaHub docs 登録，Zenodo，フィードバック対応 | 随時 | 告知文の確認 |
 | 5 | 1.0.0（API 凍結の判断） | 1 セッション | 判断 |
 
@@ -527,15 +527,28 @@ Claude のセッションからは行えない，または行うべきでない�
       アップロード成功を確認）。
 - [ ] リポジトリ設定 **Actions → General** で "Allow GitHub Actions to
       create and approve pull requests" を有効にする（Dependabot / TagBot 用）。
-- [ ] 0.1.0 完成の報告を受けたら，`main` の該当コミット（`Release 0.1.0`）に
+- [ ] `main` の `Release 0.1.0` コミット（`ebca9d1`）に
       `@JuliaRegistrator register` とコメントする（`Release notes:` 以下に
-      CHANGELOG の該当節を貼る）。以降の版も同じ。
+      CHANGELOG の該当節を貼る）。新規パッケージは AutoMerge まで 3 日待機。
+- [ ] 0.1.0 のマージ後，`Release 0.2.0`（`69c009c`），続いて `Release 0.3.0`
+      （`9147f6a`）のコミットにも同じコメントをする（既存パッケージの新版は
+      通常数十分で AutoMerge）。各版の TagBot がタグとリリースを作り，docs の
+      `v0.x.y/` と `stable/` が配備される。
 - [ ] 0.1.0 登録後，Zenodo の GitHub 連携を `MappyDS.jl` で有効にする。
 - [ ] 0.1.0 登録後，JuliaDocs/DocumentationGeneratorRegistry への PR
       （Claude が用意する）を確認する。
 
 ## 12. 変更履歴
 
+- 2026-11-09 (2): Phase 3（0.3.0）の実装完了。`release-0.3` で CI を緑にして
+  `main` に ff マージ。直した点: Makie 拡張は ExplicitImports のため
+  `using Makie: Axis, ...` と明示し，描画クロージャ名が Makie の `update!` と
+  衝突しないよう改名；Makie も `image` をエクスポートするので例題では
+  `using MappyDS: image` が必要（plotting ガイドに注記）；Izhikevich の
+  `find_local_bf` テストは ODE 許容誤差を 1e-8 / 1e-10 に締める。
+  例題は Literate.jl 形式で `examples/` に置き，docs ビルドで実行して
+  図と出力を載せる（docs 環境に CairoMakie と StaticArrays を追加）。
+  Python 側: `working_examples.rst` から Julia 版の例題ページへリンク。
 - 2026-11-09: Phase 2（0.2.0）の実装完了。Phase 3 の数値部分（`hes_p`，`find_local_bf`，
   `trace_local_bf(_arclength)`）を `release-0.3` ブランチで作成中。
 - 2026-11-08 (2): Phase 1 の実装完了を記録。CI を緑にするまでに直した点:
