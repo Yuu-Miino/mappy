@@ -471,7 +471,7 @@ deploydocs(;
 | 1 | 0.1.0 の実装（functions → modes → maps → root/continuation → docs），Python 側の参照値エクスポートと JSON 共有，登録申請 | **実装完了（2026-11-08，1 セッション）**: `MappyDS.jl` `main` の `Release 0.1.0` コミットで CI 全ジョブ成功（単体テスト 810 件，Python 版の参照値と 1e-6〜1e-7 で一致）。`tests/export_reference.py` を Python 側に追加 | 登録コメント（未），AutoMerge 待機 3 日 |
 | 2 | 0.2.0（`jac_p`，擬弧長法） | **実装完了（2026-11-09）**: `MappyDS.jl` `main` の `Release 0.2.0` コミット。補正子は ODE 写像のノイズ床に対応するため「残差が改善しなくなった時点で最良点を採用」する判定を追加 | 登録コメント（0.1.0 の 3 日待機後） |
 | 3 | 0.3.0（`hes_p`，分岐曲線，Makie 拡張，例題 5 本），Python 側の docs リンクと README 更新（Python 0.3.1） | **実装完了（2026-11-09）**: `MappyDS.jl` `main` の `Release 0.3.0` コミット（単体テスト 1,860 件，全ジョブ成功）。`examples/` 5 本は Literate.jl で書き，docs の「Working examples」でビルド時に実行（Alpazur の PD 点 B1 ≈ 9.08 を含む）。Python 側は docs のナビと README から Julia 版へリンク済み | 登録コメント（0.1.0 → 0.2.0 → 0.3.0 の順，各 AutoMerge 後） |
-| 4 | Discourse の Package announcements，JuliaHub docs 登録，Zenodo，フィードバック対応 | 随時 | 告知文の確認 |
+| 4 | Discourse の Package announcements，JuliaHub docs 登録，Zenodo，フィードバック対応 | **完了（2026-11-12）**: Zenodo DOI 発行，DocumentationGeneratorRegistry PR #53（マージ待ち），Discourse に `[ANN]` 投稿。以後はフィードバック対応 | 告知文の確認（済） |
 | 5 | 1.0.0（API 凍結の判断） | 1 セッション | 判断 |
 
 各セッションの終わりには CI が緑で，docs の `dev` が更新された状態に
@@ -620,6 +620,10 @@ General の PR には AutoMerge がガイドライン判定をコメントする
 
 ## 13. 変更履歴
 
+- 2026-11-12 (4): Discourse の Package announcements に告知を投稿（新規
+  アカウントはリンク付き投稿に trust level 1 が必要なので，閲覧後に投稿）。
+  Phase 4 完了。残るは Phase 5（1.0 の API 凍結判断）と，PR #53 のマージ確認，
+  フィードバック対応。
 - 2026-11-12 (3): Zenodo 連携（concept DOI `10.5281/zenodo.24152370`，README
   バッジと `CITATION.bib` に反映），DocumentationGeneratorRegistry の PR #53
   を提出。Phase 4 の残りは Discourse の告知（§12.2）のみ。
