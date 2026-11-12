@@ -503,9 +503,10 @@ Phase 1 の最初のセッションで，`ContinuousCallback` 経由の到達時
    Dependabot の PR で CI が検知する。
 6. **2 実装の乖離**。対策: 参照値 JSON の共有（§7.2），CHANGELOG を両方で
    同じ形式にする，機能対応表を docs に置く。
-7. **secrets の運用ミス**（`DOCUMENTER_KEY` を TagBot と docs で共有）。
-   対策: `docs/PUBLISHING.md` 相当の手順書を Julia 側にも置き，鍵は
-   Python 用とは別に発行する。
+7. **secrets の運用ミス**。`DOCUMENTER_KEY` は `doc.mappy` の deploy key
+   なので TagBot が `MappyDS.jl` にタグを push するには使えない（0.1.0 の
+   初回 TagBot で判明）。TagBot には `MappyDS.jl` 自身の deploy key
+   `TAGBOT_KEY` を別に発行する。手順書は `CONTRIBUTING.md` に置いた。
 8. **ライセンス**: ModelingToolkit v11 の AGPL 部分に依存しない（§4.2）。
 
 ## 11. 人手が必要な作業（チェックリスト）
@@ -531,6 +532,11 @@ Claude のセッションからは行えない，または行うべきでない�
       `@JuliaRegistrator register` とコメントする（2026-11-09 実施。登録 PR:
       <https://github.com/JuliaRegistries/General/pull/175403>。新規パッケージは
       AutoMerge まで 3 日待機）。
+- [ ] TagBot 用に `MappyDS.jl` 自身の deploy key を発行する（2026-11-12 に
+      必要と判明。`ssh-keygen -t ed25519 -N "" -C "MappyDS TagBot" -f mappyds_tagbot_key`，
+      公開鍵を **MappyDS.jl** の Settings → Deploy keys に *Allow write access*
+      で追加，秘密鍵を secret **`TAGBOT_KEY`** に置く）。その後 Actions の
+      TagBot を *Run workflow* で手動実行すると `v0.1.0` が打たれる。
 - [ ] 0.1.0 のマージ後，`Release 0.2.0`（`69c009c`），続いて `Release 0.3.0`
       （`9147f6a`）のコミットにも同じコメントをする（既存パッケージの新版は
       通常数十分で AutoMerge）。各版の TagBot がタグとリリースを作り，docs の
@@ -611,6 +617,9 @@ General の PR には AutoMerge がガイドライン判定をコメントする
 
 ## 13. 変更履歴
 
+- 2026-11-12: 0.1.0 が General にマージ（#175403）。直後の TagBot は
+  `DOCUMENTER_KEY`（doc.mappy の鍵）では `MappyDS.jl` に push できず失敗。
+  TagBot.yml を `TAGBOT_KEY` に切り替え，§10-7 と §11 を訂正。
 - 2026-11-09 (3): 0.1.0 の登録 PR（General #175403）が立ち，AutoMerge の
   3 日タイマーが開始。Phase 4 の資料（§12: JuliaHub の docs 登録エントリ，
   Discourse 告知文案，Zenodo 手順）を追加。MappyDS.jl に `CONTRIBUTING.md`
