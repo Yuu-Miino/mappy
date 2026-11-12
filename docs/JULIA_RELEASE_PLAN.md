@@ -620,6 +620,11 @@ General の PR には AutoMerge がガイドライン判定をコメントする
 
 ## 13. 変更履歴
 
+- 2026-11-12 (6): Python 版と Julia 版の操作別ベンチマーク（`bench/`，手動
+  ワークフロー *Benchmark*，同一ランナーで計測）を追加し，docs に Performance
+  ページを掲載（定常状態で Julia が 14〜180 倍，初回コンパイル 1〜5 秒）。
+  docs とメタデータのみの 0.3.1 を登録（General #175859，`v0.3.1`，`stable`
+  docs 更新）。
 - 2026-11-12 (5): mappy の PR #37（本計画書ほか）を master にマージ。Zenodo の
   著者推定が GitHub のコントリビューター（Co-Authored-By トレーラー）を使う
   ため，MappyDS.jl に `.zenodo.json` と `CITATION.cff` を追加して著者を明示。
