@@ -542,8 +542,11 @@ Claude のセッションからは行えない，または行うべきでない�
 - [x] Zenodo の GitHub 連携を `MappyDS.jl` で有効にする（2026-11-12。concept DOI
       `10.5281/zenodo.24152370`，v0.3.0 は `…24152371`。連携前の Release は
       編集では取り込まれず，Release を削除して作り直す必要があった）。
-- [ ] 0.1.0 登録後，JuliaDocs/DocumentationGeneratorRegistry への PR
-      （Claude が用意する）を確認する。
+- [x] JuliaDocs/DocumentationGeneratorRegistry への PR
+      （2026-11-12 提出: <https://github.com/JuliaDocs/DocumentationGeneratorRegistry/pull/53>，
+      フォーク `Yuu-Miino/DocumentationGeneratorRegistry` のブランチ
+      `add-mappyds`。マージ待ち。マージ後に JuliaHub の MappyDS ページの docs
+      リンクが `julia/stable/` を指す）。
 
 ## 12. Phase 4 の準備資料
 
@@ -617,6 +620,9 @@ General の PR には AutoMerge がガイドライン判定をコメントする
 
 ## 13. 変更履歴
 
+- 2026-11-12 (3): Zenodo 連携（concept DOI `10.5281/zenodo.24152370`，README
+  バッジと `CITATION.bib` に反映），DocumentationGeneratorRegistry の PR #53
+  を提出。Phase 4 の残りは Discourse の告知（§12.2）のみ。
 - 2026-11-12 (2): 0.2.0 / 0.3.0 の登録完了（General #175847, #175848）。
   両 PR とも「breaking なのに release notes が無い」で AutoMerge が止まり，
   `Release notes:` 付きで再コメントして解消。以後 TagBot は自動で動作
