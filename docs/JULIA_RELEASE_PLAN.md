@@ -532,15 +532,13 @@ Claude のセッションからは行えない，または行うべきでない�
       `@JuliaRegistrator register` とコメントする（2026-11-09 実施。登録 PR:
       <https://github.com/JuliaRegistries/General/pull/175403>。新規パッケージは
       AutoMerge まで 3 日待機）。
-- [ ] TagBot 用に `MappyDS.jl` 自身の deploy key を発行する（2026-11-12 に
-      必要と判明。`ssh-keygen -t ed25519 -N "" -C "MappyDS TagBot" -f mappyds_tagbot_key`，
-      公開鍵を **MappyDS.jl** の Settings → Deploy keys に *Allow write access*
-      で追加，秘密鍵を secret **`TAGBOT_KEY`** に置く）。その後 Actions の
-      TagBot を *Run workflow* で手動実行すると `v0.1.0` が打たれる。
-- [ ] 0.1.0 のマージ後，`Release 0.2.0`（`69c009c`），続いて `Release 0.3.0`
-      （`9147f6a`）のコミットにも同じコメントをする（既存パッケージの新版は
-      通常数十分で AutoMerge）。各版の TagBot がタグとリリースを作り，docs の
-      `v0.x.y/` と `stable/` が配備される。
+- [x] TagBot 用に `MappyDS.jl` 自身の deploy key `TAGBOT_KEY` を発行する
+      （2026-11-12 設定済み。手動実行で `v0.1.0` を作成）。
+- [x] `Release 0.2.0`（`69c009c`）と `Release 0.3.0`（`9147f6a`）の登録コメント
+      （2026-11-12 完了。General #175847 / #175848。0.x の minor 上げは
+      breaking 扱いで **`Release notes:` が必須**（無いと AutoMerge が止まる）。
+      TagBot が `v0.2.0` / `v0.3.0` を自動作成，docs は `v0.1`〜`v0.3` と
+      `stable`（→ v0.3.0）が配備済み）。
 - [ ] 0.1.0 登録後，Zenodo の GitHub 連携を `MappyDS.jl` で有効にする。
 - [ ] 0.1.0 登録後，JuliaDocs/DocumentationGeneratorRegistry への PR
       （Claude が用意する）を確認する。
@@ -617,6 +615,12 @@ General の PR には AutoMerge がガイドライン判定をコメントする
 
 ## 13. 変更履歴
 
+- 2026-11-12 (2): 0.2.0 / 0.3.0 の登録完了（General #175847, #175848）。
+  両 PR とも「breaking なのに release notes が無い」で AutoMerge が止まり，
+  `Release notes:` 付きで再コメントして解消。以後 TagBot は自動で動作
+  （`v0.2.0`, `v0.3.0` のタグ・Release・docs）。0.1.0〜0.3.0 の 3 版が
+  General に入り，`stable/` docs は 0.3.0。残りは Phase 4（Zenodo，
+  DocumentationGeneratorRegistry，告知）。
 - 2026-11-12: 0.1.0 が General にマージ（#175403）。直後の TagBot は
   `DOCUMENTER_KEY`（doc.mappy の鍵）では `MappyDS.jl` に push できず失敗。
   TagBot.yml を `TAGBOT_KEY` に切り替え，§10-7 と §11 を訂正。
