@@ -620,6 +620,10 @@ General の PR には AutoMerge がガイドライン判定をコメントする
 
 ## 13. 変更履歴
 
+- 2026-11-12 (5): mappy の PR #37（本計画書ほか）を master にマージ。Zenodo の
+  著者推定が GitHub のコントリビューター（Co-Authored-By トレーラー）を使う
+  ため，MappyDS.jl に `.zenodo.json` と `CITATION.cff` を追加して著者を明示。
+  v0.3.0 のレコードは Zenodo 上で著者を手修正。
 - 2026-11-12 (4): Discourse の Package announcements に告知を投稿（新規
   アカウントはリンク付き投稿に trust level 1 が必要なので，閲覧後に投稿）。
   Phase 4 完了。残るは Phase 5（1.0 の API 凍結判断）と，PR #53 のマージ確認，
