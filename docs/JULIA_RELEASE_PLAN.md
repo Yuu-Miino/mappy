@@ -539,7 +539,9 @@ Claude のセッションからは行えない，または行うべきでない�
       breaking 扱いで **`Release notes:` が必須**（無いと AutoMerge が止まる）。
       TagBot が `v0.2.0` / `v0.3.0` を自動作成，docs は `v0.1`〜`v0.3` と
       `stable`（→ v0.3.0）が配備済み）。
-- [ ] 0.1.0 登録後，Zenodo の GitHub 連携を `MappyDS.jl` で有効にする。
+- [x] Zenodo の GitHub 連携を `MappyDS.jl` で有効にする（2026-11-12。concept DOI
+      `10.5281/zenodo.24152370`，v0.3.0 は `…24152371`。連携前の Release は
+      編集では取り込まれず，Release を削除して作り直す必要があった）。
 - [ ] 0.1.0 登録後，JuliaDocs/DocumentationGeneratorRegistry への PR
       （Claude が用意する）を確認する。
 
@@ -604,8 +606,8 @@ PR のタイトルは `Add MappyDS` で足りる。CI が TOML と URL を検査
 1. <https://zenodo.org/account/settings/github/> で `Yuu-Miino/MappyDS.jl` を ON にする。
 2. 以降，TagBot が GitHub Release を作るたびに Zenodo が DOI を発行する
    （既に打たれた `v0.1.0` 等は，Release を一度編集・保存すれば取り込まれる）。
-3. 発行された concept DOI を `README.md` のバッジと `CITATION.bib` に入れる
-   （Claude が次のセッションで行う）。
+3. 発行された concept DOI `10.5281/zenodo.24152370` を `README.md` のバッジと
+   `CITATION.bib` に入れた（2026-11-12）。
 
 ### 12.4 登録 PR の確認方法
 
