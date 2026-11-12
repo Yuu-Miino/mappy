@@ -36,6 +36,10 @@ For example:
 The mode graphs below are written as in :doc:`concept_of_modes`; the mode
 names used inside the scripts may differ.
 
+The Julia port ships the same five examples as Literate.jl scripts, rendered
+with their output in its documentation: `Working examples (MappyDS.jl)
+<https://yuu-miino.github.io/doc.mappy/julia/stable/examples/>`_.
+
 Hénon map
 =========
 
