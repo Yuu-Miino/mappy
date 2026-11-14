@@ -136,3 +136,10 @@ filterwarnings = ["error"]
 [tool.coverage.run]
 source = ["mappy_ds"]
 branch = true
+
+[tool.uv]
+# Restrict the *development* lockfile to Python >= 3.11.5. soupsieve >= 4.0
+# (needed for CVE-2026-126190/-126191/-126193, pulled in via the docs theme)
+# requires 3.11.5, so without this uv keeps a vulnerable soupsieve 2.x for
+# 3.11.0-3.11.4. The package itself still supports any Python >= 3.11.
+environments = ["python_full_version >= '3.11.5'"]
